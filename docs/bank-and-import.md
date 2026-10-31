@@ -11,8 +11,12 @@ Paste the **setup token** (a long string of letters) or **access URL** (`https:/
 What happens:
 
 1. Hearth claims the setup token once and stores the resulting access URL in its local database. Setup tokens can only be claimed once, so if you need to reconnect, generate a new one.
-2. It pulls every account and all the transaction history the bank allows (from the **Pull history from** date — leave it at 2000-01-01 for "everything").
+2. It pulls every account and the transaction history the bank allows, from the **Pull history from** date. SimpleFIN only allows 90 days per request, so Hearth steps back 90 days at a time — up to about 2 years — and stops when history runs out. UK open banking usually gives 90 days to 2 years; for anything older, [import a statement](#importing-statements).
 3. It then syncs automatically every 4 hours, re-reading the last 14 days each time so pending card payments that later post with a different reference don't end up duplicated.
+
+### Synci (UK banks)
+
+In Synci go to **Destinations → SimpleFIN** (or **Actual Budget**, which uses the same protocol), create a connection, choose the accounts, and copy the **setup token**. Paste it into Hearth and press **Connect and import**. Synci asks you to re-approve your bank about every 90 days; when payments stop arriving, renew it in Synci and Hearth carries on.
 
 Per connection you can **Sync now**, **Re-pull history**, switch **Auto** sync off, or **Remove** it (transactions already imported stay).
 

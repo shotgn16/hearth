@@ -39,7 +39,7 @@ function haIdentity(req) {
 // ---------------- public: first-run setup + login ----------------
 api.get('/status', (req, res) => {
   const ha = haIdentity(req);
-  res.json({ needsSetup: !q.get('SELECT 1 FROM users LIMIT 1'), version: process.env.HEARTH_VERSION || '1.3.0', addon: config.isAddon, ha_user: ha ? { name: ha.name } : null });
+  res.json({ needsSetup: !q.get('SELECT 1 FROM users LIMIT 1'), version: process.env.HEARTH_VERSION || '1.3.1', addon: config.isAddon, ha_user: ha ? { name: ha.name } : null });
 });
 
 // Opening Hearth from the HA sidebar signs you in as your HA user once linked
@@ -252,9 +252,12 @@ api.post('/connections', wrap(async (req, res) => {
   if (provider === 'simplefin') config = { access_url: access_url || await banks.claimSimplefin(setup_token), history_from, owner_user_id };
   else config = { ...rest, history_from, owner_user_id };
   const id = Number(q.run('INSERT INTO connections(household_id,provider,name,config) VALUES(?,?,?,?)', req.hid, provider, name || 'superFin', JSON.stringify(config)).lastInsertRowid);
-  const result = await banks.syncConnection(q.get('SELECT * FROM connections WHERE id=?', id), { full: true });
-  await scheduler.afterNewTransactions(req.hid);
-  res.json({ id, ...result });
+  // the token is already used up, so keep the connection even if the first import fails — "Sync now" retries it
+  try {
+    const result = await banks.syncConnection(q.get('SELECT * FROM connections WHERE id=?', id), { full: true });
+    await scheduler.afterNewTransactions(req.hid);
+    res.json({ id, ...result });
+  } catch (e) { res.json({ id, added: 0, accounts: 0, error: `Connected, but the first import failed: ${e.message}. Press "Sync now" to try again.` }); }
 }));
 api.post('/connections/:id/sync', wrap(async (req, res) => {
   const c = q.get('SELECT * FROM connections WHERE id=? AND household_id=?', req.params.id, req.hid);

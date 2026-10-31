@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.1
+- Bank feeds (SimpleFIN, including Synci for UK banks): history is fetched in 90-day steps as SimpleFIN requires, reaching back up to about 2 years on the first import and stopping when history runs out
+- Clearer messages for a used or expired setup token, and the connection is kept if the first import fails so "Sync now" can retry without a new token
+- Supports SimpleFIN protocol v2 (bank names and error messages)
+
 ## 1.3.0
 - Outlook.com, Hotmail and Microsoft 365 mailboxes: sign in with Microsoft through your own Entra app registration (device-code sign-in that works inside the HA panel); receipts are read through Microsoft Graph with read-only access
 - On-premises Exchange mailboxes through Exchange Web Services (NTLM or Basic)

@@ -95,7 +95,7 @@ async function banks(el) {
     try {
       const t = d.token.trim();
       const r = await api('/connections', { method: 'POST', body: { provider: 'simplefin', name: d.name, ...(t.startsWith('http') ? { access_url: t } : { setup_token: t }), history_from: d.history_from, owner_user_id: d.owner_user_id ? Number(d.owner_user_id) : null } });
-      toast(`Connected ${r.accounts} accounts · ${r.added} transactions imported`); await loadRefs(); banks(el);
+      if (r.error) toast(r.error); else toast(`Connected ${r.accounts} accounts · ${r.added} transactions imported`); await loadRefs(); banks(el);
     } catch (err) { fail(err); b.disabled = false; b.textContent = 'Connect and import'; }
   };
   el.querySelector('#gf').onsubmit = async (e) => {

@@ -2,7 +2,7 @@
 ARG BUILD_FROM=node:22-alpine
 FROM ${BUILD_FROM}
 ARG BUILD_ARCH
-ARG BUILD_VERSION=1.3.0
+ARG BUILD_VERSION=1.3.1
 
 ENV NODE_ENV=production DATA_DIR=/data PORT=8484
 RUN apk add --no-cache tzdata wget

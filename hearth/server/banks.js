@@ -11,31 +11,62 @@ const { ingest } = require('./ingest');
 const b64 = (s) => Buffer.from(s, 'base64').toString('utf8');
 
 async function claimSimplefin(setupToken) {
-  const claimUrl = b64(setupToken.trim());
-  const r = await fetch(claimUrl, { method: 'POST', headers: { 'Content-Length': '0' } });
-  if (!r.ok) throw new Error(`Claiming setup token failed (${r.status}). Tokens can only be claimed once.`);
+  const claimUrl = b64(setupToken.trim().replace(/\s+/g, ''));
+  if (!/^https?:\/\//.test(claimUrl)) throw new Error("That doesn't look like a SimpleFIN setup token — copy the whole token again");
+  const r = await fetch(claimUrl, { method: 'POST', headers: { 'Content-Length': '0' }, signal: AbortSignal.timeout(30000) });
+  if (r.status === 403) throw new Error('This setup token has already been used or has expired. Create a new one in your bank feed (e.g. Synci → Destinations) and paste that.');
+  if (!r.ok) throw new Error(`Claiming the setup token failed (${r.status})`);
   return (await r.text()).trim(); // access URL with embedded basic-auth credentials
 }
 
-async function simplefinFetch(accessUrl, startDate) {
+// SimpleFIN servers allow at most 90 days per request, and expect only a handful of requests a day.
+const WINDOW_DAYS = 90;
+const MAX_WINDOWS = 9; // first import reaches back up to ~2 years (or until history runs out)
+
+async function simplefinRequest(accessUrl, params) {
   const u = new URL(accessUrl);
   const auth = Buffer.from(`${decodeURIComponent(u.username)}:${decodeURIComponent(u.password)}`).toString('base64');
   u.username = ''; u.password = '';
-  const url = `${u.toString().replace(/\/$/, '')}/accounts?pending=1${startDate ? `&start-date=${Math.floor(new Date(startDate) / 1000)}` : ''}`;
-  const r = await fetch(url, { headers: { Authorization: `Basic ${auth}` } });
-  if (!r.ok) throw new Error(`Bank sync failed (${r.status})`);
-  const data = await r.json();
-  return {
-    errors: data.errors || [],
-    accounts: (data.accounts || []).map((a) => ({
-      external_id: a.id, name: a.name, institution: a.org?.name || a.org?.domain, currency: a.currency, balance: Number(a.balance),
-      balance_date: a['balance-date'] ? new Date(a['balance-date'] * 1000).toISOString() : null,
-      transactions: (a.transactions || []).map((t) => ({
-        external_id: t.id, date: new Date((t.transacted_at || t.posted) * 1000).toISOString().slice(0, 10),
-        amount: Number(t.amount), description: [t.payee, t.description].filter(Boolean).join(' — ') || t.memo || '', pending: !!t.pending,
-      })),
-    })),
-  };
+  const url = `${u.toString().replace(/\/$/, '')}/accounts?${new URLSearchParams({ version: '2', pending: '1', ...params })}`;
+  const r = await fetch(url, { headers: { Authorization: `Basic ${auth}` }, signal: AbortSignal.timeout(120000) });
+  if (r.status === 403 || r.status === 401) throw new Error('The bank feed refused access — the connection may have been removed or disabled. Reconnect it with a new setup token.');
+  if (!r.ok) { const t = (await r.text().catch(() => '')).slice(0, 200); throw new Error(`Bank sync failed (${r.status})${t ? `: ${t}` : ''}`); }
+  return r.json();
+}
+
+async function simplefinFetch(accessUrl, startDate) {
+  const DAY = 86400;
+  const now = Math.floor(Date.now() / 1000) + DAY; // end-date is exclusive; include today
+  const from = startDate ? Math.floor(new Date(startDate) / 1000) : now - WINDOW_DAYS * DAY;
+  const accounts = new Map(); const errors = new Set();
+  let end = now, windows = 0, emptyRun = 0;
+  while (end > from && windows < MAX_WINDOWS) {
+    const start = Math.max(from, end - WINDOW_DAYS * DAY);
+    const data = await simplefinRequest(accessUrl, { 'start-date': String(start), 'end-date': String(end) });
+    windows++;
+    for (const e of data.errlist || []) errors.add(e.msg || e.code);
+    for (const e of data.errors || []) errors.add(String(e));
+    const orgs = Object.fromEntries((data.connections || []).map((c) => [c.conn_id, c.name || c.org_name]));
+    let got = 0;
+    for (const a of data.accounts || []) {
+      let acc = accounts.get(a.id);
+      if (!acc) {
+        acc = { external_id: a.id, name: a.name, institution: a.org?.name || a.org?.domain || orgs[a.conn_id] || null, currency: /^[A-Z]{3}$/.test(a.currency || '') ? a.currency : 'GBP',
+          balance: Number(a.balance), balance_date: a['balance-date'] ? new Date(a['balance-date'] * 1000).toISOString() : null, tx: new Map() };
+        accounts.set(a.id, acc);
+      }
+      for (const t of a.transactions || []) {
+        if (acc.tx.has(t.id)) continue; got++;
+        acc.tx.set(t.id, { external_id: t.id, date: new Date((Number(t.transacted_at) || Number(t.posted)) * 1000).toISOString().slice(0, 10),
+          amount: Number(t.amount), description: [t.payee, t.description].filter(Boolean).join(' — ') || t.memo || '', pending: !!t.pending || Number(t.posted) === 0 });
+      }
+    }
+    // stop reaching back once a whole window comes back empty (history has run out)
+    emptyRun = got ? 0 : emptyRun + 1;
+    if (emptyRun >= 1 && windows > 1) break;
+    end = start;
+  }
+  return { errors: [...errors], accounts: [...accounts.values()].map(({ tx, ...a }) => ({ ...a, transactions: [...tx.values()] })) };
 }
 
 const pick = (obj, path) => String(path || '').split('.').filter(Boolean).reduce((o, k) => (o == null ? o : o[k]), obj);
