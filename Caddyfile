@@ -1,0 +1,10 @@
+# HTTPS for Hearth on your local network.
+# "tls internal" makes Caddy create its own certificate authority. To stop browser warnings,
+# install caddy-data/caddy/pki/authorities/local/root.crt on each device (iPhone: AirDrop it, then
+# Settings → General → VPN & Device Management, then Settings → General → About → Certificate Trust Settings).
+# If you already use a reverse proxy (Nginx Proxy Manager, Traefik, Home Assistant's NGINX add-on, Tailscale serve),
+# point it at http://hearth:8484 instead and skip this.
+:8443 {
+	tls internal
+	reverse_proxy hearth:8484
+}

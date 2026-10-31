@@ -1,0 +1,31 @@
+# Standalone install (without Home Assistant). With Home Assistant, install it as an add-on instead — see README.
+services:
+  hearth:
+    build: ./hearth
+    container_name: hearth
+    restart: unless-stopped
+    ports:
+      - "8484:8484"
+    volumes:
+      - ./data:/data
+    environment:
+      TZ: Europe/London
+      OLLAMA_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: qwen2.5:7b-instruct
+      # OLLAMA_FAST_MODEL: qwen2.5:3b-instruct
+      # OLLAMA_VISION_MODEL: qwen2.5vl:7b
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Optional HTTPS on your LAN (needed to install on phones / receive push):
+  #   docker compose --profile https up -d   → https://<server>:8443
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["https"]
+    restart: unless-stopped
+    ports:
+      - "8443:8443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy-data:/data
+    depends_on: [hearth]

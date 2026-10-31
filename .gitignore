@@ -1,0 +1,5 @@
+node_modules/
+data/
+demo-data/
+caddy-data/
+.env

@@ -1,0 +1,25 @@
+configuration:
+  ollama_url:
+    name: Ollama address
+    description: Where your Ollama server runs, e.g. http://192.168.1.50:11434. Can be changed later in Hearth's own settings.
+  ollama_model:
+    name: Chat model
+    description: Model for the assistant, advice and reviews. Instruct models with tool support work best (qwen2.5:7b-instruct, llama3.1:8b, qwen3).
+  ollama_fast_model:
+    name: Fast model (optional)
+    description: A smaller model for background jobs like categorising and reading notes, e.g. qwen2.5:3b-instruct. Leave empty to use the chat model.
+  ollama_vision_model:
+    name: Vision model (optional)
+    description: Enables receipt scanning, e.g. qwen2.5vl:7b, llama3.2-vision or minicpm-v. Leave empty to hide receipt scanning.
+  timezone:
+    name: Time zone
+    description: Used for paydays, morning summaries and month boundaries.
+  auto_create_ha_users:
+    name: Let any Home Assistant user in
+    description: When on, any HA user who opens the panel gets their own Hearth login in your household. When off, they link to an existing Hearth user with its password the first time.
+  publish_sensors:
+    name: Publish sensors to Home Assistant
+    description: Creates sensor.hearth_* entities (free to spend, spending this month, things to check, next payment) for dashboards and automations.
+  log_level:
+    name: Log level
+    description: How much Hearth writes to the add-on log.

@@ -1,0 +1,52 @@
+name: Hearth
+version: "1.1.0"
+slug: hearth
+description: Household money manager with bank sync, budgets, forecasts and local AI (Ollama)
+url: "https://github.com/YOUR_GITHUB_USER/hearth"
+arch:
+  - aarch64
+  - amd64
+startup: application
+boot: auto
+init: true
+
+# Opens in the Home Assistant sidebar. You're signed in as your HA user automatically.
+ingress: true
+ingress_port: 8484
+panel_icon: mdi:home-currency-usd
+panel_title: Hearth
+
+# Lets Hearth send notifications through your HA notify services, read your HA calendars,
+# and publish sensors (free to spend, month spending…) — no tokens to paste.
+homeassistant_api: true
+# Read-only access to its own add-on info (to link notifications back to the sidebar panel)
+hassio_api: true
+hassio_role: default
+
+# Optional direct port for installing the app on phones outside the HA app. Off until you set a port.
+ports:
+  8484/tcp: null
+ports_description:
+  8484/tcp: Direct web access (optional — the sidebar panel works without it)
+
+backup: hot
+backup_pre: "wget -qO- http://127.0.0.1:8484/internal/checkpoint"
+
+options:
+  ollama_url: "http://homeassistant.local:11434"
+  ollama_model: "qwen2.5:7b-instruct"
+  ollama_fast_model: ""
+  ollama_vision_model: ""
+  timezone: "Europe/London"
+  auto_create_ha_users: false
+  publish_sensors: true
+  log_level: info
+schema:
+  ollama_url: url
+  ollama_model: str
+  ollama_fast_model: "str?"
+  ollama_vision_model: "str?"
+  timezone: str
+  auto_create_ha_users: bool
+  publish_sensors: bool
+  log_level: list(debug|info|warning|error)
