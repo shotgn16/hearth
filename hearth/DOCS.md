@@ -34,6 +34,9 @@ For older history, **Import statements** takes CSV, OFX/QFX and QIF from any UK 
 - **+ (Jot)** — type `£12 lunch with Sam`, `Ella's dentist £60 next Tue`, `want a new TV under 400`, or tap **Scan a receipt**.
 - **Money** — list on phones, spreadsheet-style grid on desktop with bulk edits, saved views and CSV export. Type a question into search (e.g. *coffee over £5 in September*) and press Enter to let the AI build the filter.
 - **Plan** — budgets, savings targets and the year planner (categories × months; actuals fill themselves in).
+- **Regular payments** — every subscription and bill with its payment date; a monthly checklist ticked off as payments come out (or by you); ongoing, cancelling, paused and ended (with last payment); a 12-month history grid.
+- **Email receipts** — connect a mailbox (Settings → Email receipts) and Hearth collects receipts and bills, matches them to the right bill, payment and account, and waits for you to approve.
+- **Unexpected & work** — flag unplanned costs to see what to put aside each month; track work expenses from to claim → claimed → paid back and export them for a claim.
 - **Insights** — this month, year on year, forecasts, pivot reports and AI monthly reviews.
 
 ## Home Assistant integration

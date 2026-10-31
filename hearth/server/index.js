@@ -39,7 +39,7 @@ function haIdentity(req) {
 // ---------------- public: first-run setup + login ----------------
 api.get('/status', (req, res) => {
   const ha = haIdentity(req);
-  res.json({ needsSetup: !q.get('SELECT 1 FROM users LIMIT 1'), version: '1.1.0', addon: config.isAddon, ha_user: ha ? { name: ha.name } : null });
+  res.json({ needsSetup: !q.get('SELECT 1 FROM users LIMIT 1'), version: process.env.HEARTH_VERSION || '1.2.0', addon: config.isAddon, ha_user: ha ? { name: ha.name } : null });
 });
 
 // Opening Hearth from the HA sidebar signs you in as your HA user once linked
@@ -112,7 +112,7 @@ crud('accounts', ['owner_user_id', 'name', 'institution', 'type', 'currency', 'b
 crud('categories', ['name', 'parent_id', 'color', 'icon', 'kind'], { order: 'kind DESC, name' });
 crud('tags', ['name', 'color'], { order: 'name' });
 crud('rules', ['name', 'enabled', 'priority', 'trigger', 'match_all', 'conditions', 'actions', 'stop_processing'], { json: ['conditions', 'actions'], order: 'priority, id' });
-crud('budgets', ['name', 'amount', 'period', 'start_date', 'end_date', 'category_ids', 'tag_ids', 'scope', 'user_id', 'person_id', 'event_id', 'alert_pct', 'rollover', 'color'], { json: ['category_ids', 'tag_ids'] });
+crud('budgets', ['name', 'amount', 'period', 'start_date', 'end_date', 'category_ids', 'tag_ids', 'scope', 'user_id', 'person_id', 'event_id', 'alert_pct', 'rollover', 'color', 'flag'], { json: ['category_ids', 'tag_ids'] });
 crud('goals', ['name', 'kind', 'target_amount', 'current_amount', 'target_date', 'account_id', 'scope', 'user_id', 'color']);
 crud('calendars', ['user_id', 'name', 'provider', 'url', 'credentials', 'color', 'enabled'], { after: async (req, row) => { if (row?.url) cal.syncCalendar(row).catch(() => {}); } });
 crud('watches', ['user_id', 'query', 'url', 'target_price', 'provider', 'enabled'], { after: async (req, row) => { if (row?.url) prices.checkWatch(row).catch(() => {}); } });
@@ -157,6 +157,10 @@ function txQuery(req, { forExport = false } = {}) {
   if (f.max) { w.push('ABS(t.amount)<=?'); p.push(Number(f.max)); }
   if (f.uncategorised === '1') w.push('t.category_id IS NULL');
   if (f.categorised_by) { w.push('t.categorised_by=?'); p.push(f.categorised_by); }
+  if (f.id) { w.push('t.id=?'); p.push(Number(f.id)); }
+  if (f.unexpected === '1') w.push('t.unexpected=1');
+  if (f.work_expense === '1') w.push('t.work_expense=1');
+  if (f.claim_status) { w.push("COALESCE(t.claim_status,'to_claim')=?"); p.push(f.claim_status); }
   if (f.tag_id) { w.push('t.id IN (SELECT transaction_id FROM transaction_tags WHERE tag_id=?)'); p.push(f.tag_id); }
   const sortable = { date: 't.date', amount: 't.amount', merchant: 't.merchant', category: 'c.name', account: 'a.name' };
   const sort = `${sortable[f.sort] || 't.date'} ${f.dir === 'asc' ? 'ASC' : 'DESC'}, t.id DESC`;
@@ -172,7 +176,7 @@ function txQuery(req, { forExport = false } = {}) {
 api.get('/transactions', (req, res) => res.json(txQuery(req)));
 api.get('/transactions/export.csv', (req, res) => {
   const { rows } = txQuery(req, { forExport: true });
-  const cols = ['date', 'amount', 'merchant', 'description', 'category_name', 'account_name', 'person_name', 'event_title', 'kind', 'notes'];
+  const cols = ['date', 'amount', 'merchant', 'description', 'category_name', 'account_name', 'person_name', 'event_title', 'kind', 'notes', 'unexpected', 'work_expense', 'claim_status', 'claim_ref', 'claimed_at', 'reimbursed_at'];
   const esc = (v) => (v == null ? '' : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
   res.setHeader('Content-Type', 'text/csv'); res.setHeader('Content-Disposition', 'attachment; filename="transactions.csv"');
   res.send([cols.join(','), ...rows.map((r) => [...cols.map((c) => esc(r[c])), ''].slice(0, cols.length).join(','))].join('\n'));
@@ -183,10 +187,13 @@ api.post('/transactions', wrap(async (req, res) => {
   scheduler.afterNewTransactions(req.hid).catch(() => {});
   res.json(q.get('SELECT * FROM transactions WHERE id=?', r.ids[0]));
 }));
-const TX_FIELDS = ['date', 'amount', 'description', 'merchant', 'category_id', 'person_id', 'event_id', 'user_id', 'notes', 'color', 'kind', 'account_id'];
+const TX_FIELDS = ['date', 'amount', 'description', 'merchant', 'category_id', 'person_id', 'event_id', 'user_id', 'notes', 'color', 'kind', 'account_id', 'unexpected', 'work_expense', 'claim_status', 'claim_ref'];
 function patchTx(hid, ids, body) {
+  if (body.work_expense === 1 || body.work_expense === true) { body.work_expense = 1; if (body.claim_status === undefined) body.claim_status = 'to_claim'; }
+  if (body.work_expense === 0 || body.work_expense === false) { body.work_expense = 0; body.claim_status = null; }
+  if (body.unexpected !== undefined) body.unexpected = body.unexpected ? 1 : 0;
   const keys = TX_FIELDS.filter((k) => body[k] !== undefined);
-  if (keys.length) for (const id of ids) q.run(`UPDATE transactions SET ${keys.map((k) => `${k}=?`).join(',')}${body.category_id !== undefined ? ",categorised_by='user'" : ''} WHERE id=? AND household_id=?`, ...keys.map((k) => (body[k] === '' ? null : body[k])), id, hid);
+  if (keys.length) for (const id of ids) q.run(`UPDATE transactions SET ${keys.map((k) => `${k}=?`).join(',')}${body.category_id !== undefined ? ",categorised_by='user'" : ''} WHERE id=? AND household_id=?`, ...keys.map((k) => (body[k] === '' ? null : body[k] ?? null)), id, hid);
   if (body.add_tag) for (const id of ids) q.run('INSERT OR IGNORE INTO transaction_tags VALUES(?,?)', id, body.add_tag);
   if (body.remove_tag) for (const id of ids) q.run('DELETE FROM transaction_tags WHERE transaction_id=? AND tag_id=?', id, body.remove_tag);
   let alsoUpdated = 0;
@@ -259,16 +266,104 @@ api.post('/connections/:id/sync', wrap(async (req, res) => {
 api.patch('/connections/:id', (req, res) => { if (req.body.auto_sync !== undefined) q.run('UPDATE connections SET auto_sync=? WHERE id=? AND household_id=?', req.body.auto_sync ? 1 : 0, req.params.id, req.hid); if (req.body.name) q.run('UPDATE connections SET name=? WHERE id=? AND household_id=?', req.body.name, req.params.id, req.hid); res.json({ ok: true }); });
 api.delete('/connections/:id', (req, res) => { q.run('DELETE FROM connections WHERE id=? AND household_id=?', req.params.id, req.hid); res.json({ ok: true }); });
 
-// ---------------- subscriptions ----------------
-api.get('/subscriptions', (req, res) => res.json(q.all(`SELECT s.*, c.name category_name, c.color category_color, c.icon category_icon FROM subscriptions s
-  LEFT JOIN categories c ON c.id=s.category_id WHERE s.household_id=? ORDER BY s.status, s.next_date`, req.hid)));
-api.post('/subscriptions/detect', (req, res) => res.json(detectSubscriptions(req.hid)));
+// ---------------- subscriptions & bills tracker ----------------
+const tracker = require('./tracker');
+const expenses = require('./expenses');
+const INTERVAL = { weekly: 7, fortnightly: 14, monthly: 30.4, quarterly: 91, yearly: 365 };
+api.get('/subscriptions', (req, res) => res.json(tracker.list(req.hid)));
+api.post('/subscriptions/detect', (req, res) => { const r = detectSubscriptions(req.hid); tracker.linkManual(req.hid); tracker.refreshNextDates(req.hid); res.json(r); });
+// Add one yourself — e.g. something paid from an account Hearth can't see, or a new subscription before its first payment
+api.post('/subscriptions', wrap(async (req, res) => {
+  const b = req.body; if (!b.name || !b.amount) throw err('Name and amount are needed');
+  const cadence = b.cadence || 'monthly';
+  const match = (b.match || b.name).trim();
+  if (q.get('SELECT 1 FROM subscriptions WHERE household_id=? AND merchant=?', req.hid, match)) throw err('You already track something with that name');
+  const id = Number(q.run(`INSERT INTO subscriptions(household_id,merchant,name,amount,cadence,interval_days,due_day,start_date,category_id,type,status,confirmed,manual,account_id,user_id,person_id,notes,last_date)
+    VALUES(?,?,?,?,?,?,?,?,?,?,'active',1,1,?,?,?,?,?)`, req.hid, match, b.name, Math.abs(Number(b.amount)), cadence, INTERVAL[cadence], b.due_day ? Number(b.due_day) : null,
+    b.start_date || A.iso(new Date()), b.category_id || null, b.type || 'subscription', b.account_id || null, b.user_id || null, b.person_id || null, b.notes || null, b.start_date || null).lastInsertRowid);
+  tracker.linkManual(req.hid); tracker.refreshNextDates(req.hid);
+  res.json(tracker.list(req.hid).find((x) => x.id === id));
+}));
 api.patch('/subscriptions/:id', (req, res) => {
-  for (const k of ['confirmed', 'status', 'cadence', 'amount', 'next_date', 'category_id', 'type']) if (req.body[k] !== undefined) q.run(`UPDATE subscriptions SET ${k}=? WHERE id=? AND household_id=?`, req.body[k], req.params.id, req.hid);
-  if (req.body.status === 'ignored') q.run(`UPDATE transactions SET kind='one_off', subscription_id=NULL WHERE subscription_id=?`, req.params.id);
-  if (req.body.type) q.run('UPDATE transactions SET kind=? WHERE subscription_id=?', req.body.type, req.params.id);
+  const b = { ...req.body };
+  if (b.status === 'cancelled') b.status = 'ended';
+  if (b.status === 'ended' && b.end_date === undefined) b.end_date = A.iso(new Date());
+  if (b.status && ['active', 'paused', 'cancelling'].includes(b.status) && b.end_date === undefined) b.end_date = null;
+  if (b.cadence) b.interval_days = INTERVAL[b.cadence];
+  for (const k of ['confirmed', 'status', 'cadence', 'interval_days', 'amount', 'next_date', 'category_id', 'type', 'name', 'due_day', 'start_date', 'end_date', 'notes', 'account_id', 'user_id', 'person_id']) {
+    if (b[k] !== undefined) q.run(`UPDATE subscriptions SET ${k}=? WHERE id=? AND household_id=?`, b[k] === '' ? null : b[k], req.params.id, req.hid);
+  }
+  if (b.status === 'ignored') q.run(`UPDATE transactions SET kind='one_off', subscription_id=NULL WHERE subscription_id=?`, req.params.id);
+  if (b.type) q.run('UPDATE transactions SET kind=? WHERE subscription_id=?', b.type, req.params.id);
+  tracker.refreshNextDates(req.hid);
   res.json({ ok: true });
 });
+api.delete('/subscriptions/:id', (req, res) => {
+  q.run(`UPDATE transactions SET kind='one_off', subscription_id=NULL WHERE subscription_id=? AND household_id=?`, req.params.id, req.hid);
+  q.run('DELETE FROM subscriptions WHERE id=? AND household_id=?', req.params.id, req.hid); res.json({ ok: true });
+});
+api.get('/tracker/month', (req, res) => res.json(tracker.month(req.hid, /^\d{4}-\d{2}$/.test(req.query.month || '') ? req.query.month : A.iso(new Date()).slice(0, 7))));
+api.get('/tracker/history', (req, res) => res.json(tracker.history(req.hid, Math.min(24, Number(req.query.months) || 12))));
+api.get('/tracker/due-dates', (req, res) => {
+  const s = q.get('SELECT * FROM subscriptions WHERE id=? AND household_id=?', Number(req.query.subscription_id), req.hid); if (!s) return res.json([]);
+  const c = req.query.around || A.iso(new Date()); const shift = (n) => A.iso(A.addDays(new Date(`${c}T12:00:00`), n));
+  res.json(tracker.occurrences({ ...s, end_date: null }, shift(-45), shift(45)));
+});
+api.post('/tracker/mark', wrap(async (req, res) => { const b = req.body; tracker.mark(req.hid, Number(b.subscription_id), b.due_date, b.status, b); res.json({ ok: true }); }));
+
+// ---------------- email receipts (IMAP) ----------------
+const email = require('./email');
+const EMAIL_FIELDS = ['user_id', 'name', 'host', 'port', 'secure', 'username', 'password', 'folders', 'lookback_days', 'enabled', 'allow_self_signed'];
+const safeAcct = (a) => ({ ...a, password: a.password ? '••••••' : '', state: undefined, folders: JSON.parse(a.folders || '["INBOX"]') });
+api.get('/email/accounts', (req, res) => res.json(q.all('SELECT * FROM email_accounts WHERE household_id=? ORDER BY id', req.hid).map(safeAcct)));
+api.post('/email/accounts/test', wrap(async (req, res) => {
+  let b = { secure: 1, port: 993, ...req.body };
+  if (b.id && (!b.password || b.password === '••••••')) b.password = q.get('SELECT password FROM email_accounts WHERE id=? AND household_id=?', b.id, req.hid)?.password;
+  try { res.json({ ok: true, folders: await email.testConnection(b) }); }
+  catch (e) { throw err(`Couldn't sign in: ${e.responseText || e.message}${/auth|login|credentials/i.test(e.responseText || e.message) ? ' — most providers need an app password for IMAP (see the help below).' : ''}`); }
+}));
+api.post('/email/accounts', wrap(async (req, res) => {
+  const b = req.body; if (!b.host || !b.username || !b.password) throw err('Server, username and password are needed');
+  const keys = EMAIL_FIELDS.filter((k) => b[k] !== undefined);
+  const id = Number(q.run(`INSERT INTO email_accounts(household_id${keys.map((k) => `,${k}`).join('')}) VALUES(?${keys.map(() => ',?').join('')})`, req.hid,
+    ...keys.map((k) => (k === 'folders' ? JSON.stringify(b[k]) : typeof b[k] === 'boolean' ? (b[k] ? 1 : 0) : b[k]))).lastInsertRowid);
+  const acct = q.get('SELECT * FROM email_accounts WHERE id=?', id);
+  email.syncAccount(acct).then((r) => { if (r.found) notify(req.hid, { title: 'Receipts found in your email', body: `${r.found} to check`, url: '/#/receipts' }); }).catch((e) => log.warning('first email sync', e.message));
+  res.json(safeAcct(acct));
+}));
+api.patch('/email/accounts/:id', (req, res) => {
+  const b = req.body;
+  for (const k of EMAIL_FIELDS) if (b[k] !== undefined && !(k === 'password' && (b[k] === '••••••' || b[k] === ''))) q.run(`UPDATE email_accounts SET ${k}=? WHERE id=? AND household_id=?`, k === 'folders' ? JSON.stringify(b[k]) : typeof b[k] === 'boolean' ? (b[k] ? 1 : 0) : b[k], req.params.id, req.hid);
+  if (b.folders !== undefined || b.lookback_days !== undefined) q.run(`UPDATE email_accounts SET state='{}' WHERE id=? AND household_id=?`, req.params.id, req.hid);
+  res.json({ ok: true });
+});
+api.delete('/email/accounts/:id', (req, res) => { q.run('DELETE FROM email_accounts WHERE id=? AND household_id=?', req.params.id, req.hid); res.json({ ok: true }); });
+api.post('/email/accounts/:id/sync', wrap(async (req, res) => {
+  const a = q.get('SELECT * FROM email_accounts WHERE id=? AND household_id=?', req.params.id, req.hid); if (!a) throw err('Not found', 404);
+  try { res.json(await email.syncAccount(a, { full: !!req.body.full })); } catch (e) { throw err(`Mailbox check failed: ${e.responseText || e.message}`); }
+}));
+api.get('/email/receipts', (req, res) => res.json(email.list(req.hid, ['pending', 'approved', 'ignored'].includes(req.query.status) ? req.query.status : 'pending')));
+api.get('/email/receipts/counts', (req, res) => res.json(Object.fromEntries(q.all('SELECT status, COUNT(*) n FROM email_receipts WHERE household_id=? GROUP BY status', req.hid).map((r) => [r.status, r.n]))));
+api.get('/email/receipts/:id', (req, res) => { const d = email.detail(req.hid, Number(req.params.id)); d ? res.json(d) : res.status(404).json({ error: 'Not found' }); });
+api.post('/email/receipts/:id/approve', wrap(async (req, res) => { const r = await email.approve(req.hid, req.user.id, Number(req.params.id), req.body || {}); scheduler.afterNewTransactions(req.hid).catch(() => {}); res.json(r); }));
+api.post('/email/receipts/approve-batch', wrap(async (req, res) => { let n = 0; for (const id of req.body.ids || []) { try { await email.approve(req.hid, req.user.id, Number(id), {}); n++; } catch {} } res.json({ approved: n }); }));
+api.post('/email/receipts/:id/ignore', wrap(async (req, res) => { email.ignore(req.hid, Number(req.params.id), { sender: !!req.body.sender }); res.json({ ok: true }); }));
+api.post('/email/receipts/:id/undo', wrap(async (req, res) => { email.undo(req.hid, Number(req.params.id)); res.json({ ok: true }); }));
+api.post('/email/receipts/:id/rematch', (req, res) => { email.rematch(req.hid, Number(req.params.id)); res.json(email.detail(req.hid, Number(req.params.id))); });
+api.get('/email/receipts/:id/file/:name', (req, res) => {
+  const a = email.attachmentPath(req.hid, Number(req.params.id), req.params.name);
+  if (!a || !require('fs').existsSync(a.file)) return res.status(404).json({ error: 'Not found' });
+  res.setHeader('Content-Type', a.type); res.setHeader('Content-Disposition', `inline; filename="${a.name.replace(/"/g, '')}"`); res.sendFile(a.file);
+});
+api.get('/transactions/:id/receipts', (req, res) => res.json(q.all(`SELECT id, merchant, subject, total, receipt_date, order_ref, attachments, status FROM email_receipts WHERE household_id=? AND transaction_id=? AND status='approved'`, req.hid, req.params.id)
+  .map((r) => ({ ...r, attachments: JSON.parse(r.attachments || '[]') }))));
+
+// ---------------- unexpected costs & work expenses ----------------
+api.get('/expenses/unexpected', (req, res) => res.json(expenses.unexpected(req.hid, req.query)));
+api.post('/expenses/unexpected/dismiss', (req, res) => { const d = getSetting(req.hid, 'unexpected_dismissed', []); d.push(Number(req.body.id)); setSetting(req.hid, 'unexpected_dismissed', d.slice(-1000)); res.json({ ok: true }); });
+api.get('/expenses/work', (req, res) => res.json(expenses.work(req.hid, req.query)));
+api.post('/expenses/work/status', wrap(async (req, res) => { expenses.setWorkStatus(req.hid, (req.body.ids || []).map(Number), req.body.status, req.body); res.json({ ok: true }); }));
+api.get('/expenses/work/reimbursements', (req, res) => res.json(expenses.possibleReimbursements(req.hid, Number(req.query.amount) || 0)));
 
 // ---------------- workflows ----------------
 api.post('/rules/preview', (req, res) => res.json(rules.previewRule(req.hid, req.body.conditions || [], req.body.match_all !== false)));
@@ -297,7 +392,7 @@ api.get('/dashboard', (req, res) => {
   const ins = A.insights(req.hid);
   const fc = A.forecast(req.hid, { months: 6, years: 1 });
   const budgets = q.all('SELECT * FROM budgets WHERE household_id=?', req.hid).map((b) => A.budgetStatus(req.hid, b));
-  const upcoming = q.all(`SELECT 'sub' type, merchant title, next_date date, amount FROM subscriptions WHERE household_id=? AND status='active' AND next_date BETWEEN ? AND ?
+  const upcoming = q.all(`SELECT 'sub' type, merchant title, next_date date, amount FROM subscriptions WHERE household_id=? AND status IN ('active','cancelling') AND next_date BETWEEN ? AND ?
     UNION ALL SELECT 'event', title, substr(start,1,10), COALESCE(budget, estimated_cost) FROM events WHERE household_id=? AND start BETWEEN ? AND ? AND COALESCE(budget,estimated_cost) IS NOT NULL
     ORDER BY date LIMIT 12`, req.hid, A.iso(new Date()), A.iso(A.addDays(new Date(), 21)), req.hid, A.iso(new Date()), A.iso(A.addDays(new Date(), 21)));
   const accounts = q.all('SELECT * FROM accounts WHERE household_id=? AND archived=0 ORDER BY balance DESC', req.hid);
@@ -307,11 +402,13 @@ api.get('/dashboard', (req, res) => {
   if (lastPay) { const d = new Date(`${lastPay.date}T12:00:00`); while (d <= new Date()) d.setMonth(d.getMonth() + 1); payday = A.iso(d); }
   const until = payday || A.iso(A.addDays(new Date(), 30));
   const spendable = accounts.filter((a) => !['savings', 'investment', 'pension', 'loan', 'credit'].includes(a.type)).reduce((s, a) => s + a.balance, 0);
-  const committed = q.get(`SELECT COALESCE(SUM(amount),0) v FROM subscriptions WHERE household_id=? AND status='active' AND next_date>=? AND next_date<?`, req.hid, A.iso(new Date()), until).v
+  const committed = q.get(`SELECT COALESCE(SUM(amount),0) v FROM subscriptions WHERE household_id=? AND status IN ('active','cancelling') AND next_date>=? AND next_date<?`, req.hid, A.iso(new Date()), until).v
     + q.get(`SELECT COALESCE(SUM(COALESCE(budget,estimated_cost)),0) v FROM events WHERE household_id=? AND start>=? AND start<?`, req.hid, A.iso(new Date()), until).v;
   const free = { payday, until, spendable: Math.round(spendable * 100) / 100, committed: Math.round(committed * 100) / 100, free: Math.round((spendable - committed) * 100) / 100,
     days: Math.max(1, Math.round((new Date(until) - new Date(A.iso(new Date()))) / 86400000)) };
-  res.json({ free, insights: ins, forecast: { balance: fc.balance, daily: fc.daily, lowPoint: fc.lowPoint, monthly: fc.monthly }, budgets, upcoming, accounts,
+  const trackerMonth = require('./tracker').month(req.hid, A.iso(new Date()).slice(0, 7)).totals;
+  const work = require('./expenses').work(req.hid).totals;
+  res.json({ free, tracker: trackerMonth, work, insights: ins, forecast: { balance: fc.balance, daily: fc.daily, lowPoint: fc.lowPoint, monthly: fc.monthly }, budgets, upcoming, accounts,
     inboxCount: A.inbox(req.hid).filter((i) => !i.soft).length, goals: q.all('SELECT * FROM goals WHERE household_id=?', req.hid).map(A.goalStatus) });
 });
 api.get('/insights', (req, res) => res.json(A.insights(req.hid)));
@@ -432,7 +529,7 @@ api.get('/watches/:id/advice', (req, res) => { const w = q.get('SELECT * FROM wa
 // ---------------- notifications & settings ----------------
 api.get('/notifications', (req, res) => res.json(q.all('SELECT * FROM notifications WHERE user_id=? ORDER BY id DESC LIMIT 100', req.user.id)));
 api.post('/notifications/read', (req, res) => { q.run('UPDATE notifications SET read=1 WHERE user_id=?', req.user.id); res.json({ ok: true }); });
-const SETTING_KEYS = ['ollama', 'hass_sensors', 'homeassistant', 'ntfy', 'integrations', 'large_tx_threshold', 'bank_sync_hours', 'price_check_hours', 'digest', 'theme'];
+const SETTING_KEYS = ['ollama', 'hass_sensors', 'tracker', 'email_check_minutes', 'homeassistant', 'ntfy', 'integrations', 'large_tx_threshold', 'bank_sync_hours', 'price_check_hours', 'digest', 'theme'];
 api.get('/settings', (req, res) => {
   const out = {}; for (const k of SETTING_KEYS) out[k] = getSetting(req.hid, k);
   if (out.homeassistant?.token) out.homeassistant = { ...out.homeassistant, token: '••••••' };
@@ -458,7 +555,7 @@ api.get('/homeassistant/services', wrap(async (req, res) => res.json(await ha.no
 api.get('/homeassistant/calendars', wrap(async (req, res) => res.json(await ha.calendars(req.hid))));
 api.post('/sync-all', wrap(async (req, res) => { await scheduler.tick(); res.json({ ok: true }); }));
 api.get('/backup', (req, res) => {
-  const tables = ['accounts', 'categories', 'transactions', 'tags', 'transaction_tags', 'people', 'rules', 'budgets', 'goals', 'events', 'notes', 'subscriptions', 'watches', 'plan_cells', 'saved_views'];
+  const tables = ['accounts', 'categories', 'transactions', 'tags', 'transaction_tags', 'people', 'rules', 'budgets', 'goals', 'events', 'notes', 'subscriptions', 'subscription_payments', 'email_receipts', 'watches', 'plan_cells', 'saved_views'];
   const out = { exported_at: new Date().toISOString() };
   for (const t of tables) out[t] = t === 'transaction_tags' ? q.all('SELECT tt.* FROM transaction_tags tt JOIN transactions t ON t.id=tt.transaction_id WHERE t.household_id=?', req.hid) : q.all(`SELECT * FROM ${t} WHERE household_id=?`, req.hid);
   res.setHeader('Content-Disposition', `attachment; filename="hearth-backup-${A.iso(new Date())}.json"`);

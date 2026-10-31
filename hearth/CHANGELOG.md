@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.0
+- Home Assistant now downloads a ready-made image instead of building Hearth on your machine
+- Email receipts: connect mailboxes over IMAP; Hearth finds receipts, invoices and bills (including PDF attachments), reads totals, references and items, and matches each to a bill, bank payment, account and month. Everything waits in an approval queue — approve, change the match, or dismiss; approvals are remembered per sender and can be undone
+- Regular payments tracker: set payment dates; This month checklist ticked off automatically when payments come out, or marked paid/skipped by hand; late-payment alerts; Ongoing / Cancelling / Paused / Ended (with last payment) / Not recurring; by-category view; 12-month history grid; add your own regular payments; alerts when something charges after you ended it
+- Unexpected costs: flag them, see a typical month and what to put aside, suggestions for likely ones, budgets that count only (or leave out) unexpected costs
+- Work expenses: To claim → Claimed → Paid back with claim references, repayment matching, CSV export for claims, reminders
+- Quick notes recognise work expenses and unexpected costs; new workflow actions; the assistant can look up the tracker, unexpected costs and work expenses
+- Fixed duplicate actions when a screen re-rendered
+
 ## 1.1.0
 - Removed browser device recognition and browser push notifications; notifications now go to Home Assistant notify services (your phones via the HA app), ntfy and Hearth's in-app inbox
 - Home Assistant add-on: sidebar panel via ingress with automatic sign-in as your HA user

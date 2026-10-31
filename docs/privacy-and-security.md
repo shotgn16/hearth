@@ -4,7 +4,7 @@
 
 ## Where your data lives
 
-Everything — accounts, transactions, budgets, notes, calendar copies, AI conversations and settings — is stored in a single SQLite database, `hearth.db`, in the add-on's data folder (`/data` inside the container; `./data` for Docker installs).
+Everything — accounts, transactions, budgets, notes, calendar copies, email receipts, AI conversations and settings — is stored in a single SQLite database, `hearth.db`, in the add-on's data folder (`/data` inside the container; `./data` for Docker installs). Receipt PDFs and images are kept alongside it in `receipts/`.
 
 ## What leaves your network, and when
 
@@ -14,6 +14,7 @@ Hearth has no cloud service, no account with the developers and no telemetry. It
 |---|---|---|
 | Your bank feed (superFin/SimpleFIN) | The access credentials it gave you | Every sync |
 | Calendar links (iCal) | Nothing beyond fetching the link | Hourly |
+| Your mailboxes (IMAP) | Your app password, to read mail | Every 30 minutes (configurable) |
 | Your Ollama server | Prompts containing the financial figures needed to answer | When AI features run |
 | Home Assistant | Notifications, sensor values, events, service calls | As they happen |
 | ntfy (if enabled) | Notification titles and text | As they happen |
@@ -29,7 +30,7 @@ If your Ollama server, Home Assistant and ntfy are on your own network, financia
 
 ## Stored secrets
 
-Bank access URLs, HA tokens (standalone installs only), ntfy tokens and calendar logins are stored in the database unencrypted, so:
+Bank access URLs, mailbox app passwords, HA tokens (standalone installs only), ntfy tokens and calendar logins are stored in the database unencrypted, so:
 
 - keep backups somewhere private,
 - don't expose Hearth's port directly to the internet — use the HA panel, a VPN (e.g. Tailscale or WireGuard), or a properly secured reverse proxy.

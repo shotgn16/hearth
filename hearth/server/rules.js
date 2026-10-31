@@ -57,6 +57,8 @@ async function applyActions(hid, rule, ctx, isTx) {
       case 'set_merchant': patch.merchant = a.value; break;
       case 'append_note': patch.notes = [ctx.notes, fill(a.value, ctx)].filter(Boolean).join(' · '); break;
       case 'set_event': patch.event_id = Number(a.value); break;
+      case 'mark_unexpected': patch.unexpected = 1; break;
+      case 'mark_work_expense': patch.work_expense = 1; patch.claim_status = 'to_claim'; break;
       case 'add_tag':
         if (isTx && ctx.id) {
           const tag = q.get('SELECT id FROM tags WHERE household_id=? AND (id=? OR name=?)', hid, Number(a.value) || -1, String(a.value));

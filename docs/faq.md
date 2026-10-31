@@ -7,8 +7,8 @@
 **The add-on doesn't appear in the store after adding the repository.**
 Refresh the store page (⋮ → Check for updates). Hearth needs a 64-bit system (`amd64` or `aarch64`).
 
-**Install takes a long time.**
-The first install builds the add-on on your machine; on a Raspberry Pi that can take several minutes. Updates are quicker.
+**Install fails with an image download error.**
+The ready-made image for that version may still be building (it takes a few minutes after an update is published) — try again shortly. If it keeps failing, check the [Actions tab](https://github.com/shotgn16/hearth/actions) on GitHub.
 
 **Where are the logs?**
 The add-on's **Log** tab. Set **Log level** to `debug` in the configuration for more detail.
@@ -56,6 +56,17 @@ Set *Creativity* to *Precise*, use a tool-capable model, and make sure *Let the 
 
 **Receipt scanning button is missing.**
 Set a **vision model** in **Settings → Local AI** (or the add-on options).
+
+## Email receipts
+
+**"Couldn't sign in" when connecting a mailbox.**
+Most providers need an **app password** for IMAP, not your normal password — see [Connecting a mailbox](email-receipts.md#connecting-a-mailbox). Outlook.com and Microsoft 365 need OAuth, which isn't supported yet; forward receipts to another mailbox instead.
+
+**A receipt was matched to the wrong bill.**
+Press **Change**, pick the right one, and approve. Hearth remembers the sender for next time.
+
+**Receipts aren't being found.**
+Check the right folders are selected, and that the emails arrived within the look-back period. Turning on Local AI helps with unusual receipt formats.
 
 ## Home Assistant
 

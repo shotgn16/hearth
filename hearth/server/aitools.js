@@ -23,7 +23,7 @@ function freeUntilPayday(hid) {
   if (lastPay) { const d = new Date(`${lastPay.date}T12:00:00`); while (d <= new Date()) d.setMonth(d.getMonth() + 1); payday = A.iso(d); }
   const until = payday || A.iso(A.addDays(new Date(), 30));
   const spendable = accounts.filter((a) => !['savings', 'investment', 'pension', 'loan', 'credit'].includes(a.type)).reduce((s, a) => s + a.balance, 0);
-  const committed = q.get(`SELECT COALESCE(SUM(amount),0) v FROM subscriptions WHERE household_id=? AND status='active' AND next_date>=? AND next_date<?`, hid, today(), until).v
+  const committed = q.get(`SELECT COALESCE(SUM(amount),0) v FROM subscriptions WHERE household_id=? AND status IN ('active','cancelling') AND next_date>=? AND next_date<?`, hid, today(), until).v
     + q.get(`SELECT COALESCE(SUM(COALESCE(budget,estimated_cost)),0) v FROM events WHERE household_id=? AND start>=? AND start<?`, hid, today(), until).v;
   return { payday, until, spendable: r2(spendable), committed: r2(committed), free: r2(spendable - committed), days: Math.max(1, Math.round((new Date(until) - new Date(today())) / 86400000)), balance: r2(accounts.reduce((s, a) => s + a.balance, 0)) };
 }
@@ -45,6 +45,10 @@ const DEFINITIONS = [
   fn('get_forecast', 'Projected balance for coming months based on regular payments, seasonality, plans and event budgets.', { months: N('Months ahead, default 6') }),
   fn('upcoming_events', 'Calendar events coming up with any budgets or estimated costs.', { days: N('Days ahead, default 30') }),
   fn('event_cost_history', 'What similar past calendar events actually cost, to estimate a budget.', { title: S('Event title or keywords, e.g. "birthday party"') }, ['title']),
+  fn('subscription_tracker', 'For one month: every subscription and bill due, its due date, and whether it has been paid (from the bank or marked by hand), is overdue or still to come, with totals.', { month: S('YYYY-MM, default this month') }),
+  fn('unexpected_costs', 'Unplanned costs the household has flagged (repairs, vet bills…), monthly totals for the last year, the usual amount per month, and possible unflagged ones.'),
+  fn('work_expenses', 'Work expenses to claim back, already claimed, and paid back, with totals and the oldest unclaimed item.'),
+  fn('email_receipts', 'Receipts, invoices and bills found in the household\'s email, with what each was matched to (bill/subscription, payment, account) and whether it has been approved.', { status: { type: 'string', enum: ['pending', 'approved'] } }),
   fn('price_watches', 'Products being price-watched with current, lowest and target prices and history length.'),
   fn('check_purchase', 'Check whether a purchase is affordable right now: free money until payday, relevant budget, impact on goals, similar past purchases and any price watch.', { item: S('What they want to buy'), price: N('Price in pounds'), category: S('Best-guess category name') }, ['item', 'price']),
   // actions — these create a suggestion card the person confirms; nothing changes until they tap Confirm
@@ -119,6 +123,13 @@ const RUNNERS = {
     const evs = q.all(`SELECT id, title, substr(start,1,10) date, budget FROM events WHERE household_id=? AND start<? AND (${words.map(() => 'LOWER(title) LIKE ?').join(' OR ')}) ORDER BY start DESC LIMIT 10`, hid, today(), ...words.map((w) => `%${w}%`));
     return { similar: evs.map((e) => ({ ...e, actually_spent: r2(q.get('SELECT COALESCE(SUM(-amount),0) v FROM transactions WHERE event_id=? AND amount<0', e.id).v) })) };
   },
+  subscription_tracker(hid, a) {
+    const m = require('./tracker').month(hid, /^\d{4}-\d{2}$/.test(a.month || '') ? a.month : today().slice(0, 7));
+    return { month: m.month, totals: m.totals, items: m.items.map((i) => ({ name: i.subscription.display, due: i.due_date, status: i.status, expected: i.expected, paid: i.paid_amount, paid_on: i.paid_date, category: i.subscription.category_name })) };
+  },
+  unexpected_costs(hid) { const u = require('./expenses').unexpected(hid); return { this_month: u.this_month, average_per_month: u.average_per_month, last_12_months: u.year_total, monthly: u.monthly, by_category: u.by_category, recent: u.items.slice(0, 15).map((i) => ({ date: i.date, merchant: i.merchant, amount: i.amount, note: i.notes })), possibly_unexpected: u.suggestions.map((i) => ({ date: i.date, merchant: i.merchant, amount: i.amount })) }; },
+  work_expenses(hid) { const w = require('./expenses').work(hid); return { totals: w.totals, oldest_unclaimed: w.oldest_unclaimed, items: w.items.slice(0, 30).map((i) => ({ date: i.date, merchant: i.merchant, amount: i.amount, status: i.claim_status || 'to_claim', ref: i.claim_ref })) }; },
+  email_receipts(hid, a) { return require('./email').list(hid, a.status === 'approved' ? 'approved' : 'pending').slice(0, 25).map((r) => ({ from: r.merchant, subject: r.subject, total: r.total, date: r.receipt_date, ref: r.order_ref, bill: r.subscription?.display, payment: r.transaction ? `${r.transaction.date} £${Math.abs(r.transaction.amount)}` : null, account: r.account?.name, confidence: r.suggested?.confidence, status: r.status })); },
   price_watches(hid) { return q.all('SELECT query item, last_price, lowest_price, target_price, best_store, last_checked, json_array_length(history) checks FROM watches WHERE household_id=? AND enabled=1', hid); },
   check_purchase(hid, a) {
     const f = freeUntilPayday(hid);
@@ -209,7 +220,7 @@ function describe(name, a = {}) {
     search_transactions: `Searched transactions${a.query ? ` for "${a.query}"` : ''}${a.category ? ` in ${a.category}` : ''}`, compare_periods: 'Compared two periods',
     monthly_totals: 'Looked at monthly trends', merchant_history: `Looked at history for ${a.merchant || 'a merchant'}`, get_budgets: 'Checked budgets', get_goals: 'Checked goals',
     get_subscriptions: 'Checked subscriptions and bills', get_forecast: 'Looked at the forecast', upcoming_events: 'Checked upcoming events', event_cost_history: `Looked up past costs of "${a.title || ''}"`,
-    price_watches: 'Checked price watches', check_purchase: `Checked if ${a.item || 'it'}${a.price ? ` at £${a.price}` : ''} is affordable`,
+    price_watches: 'Checked price watches', email_receipts: 'Checked email receipts', subscription_tracker: `Checked which payments have come out${a.month ? ` in ${a.month}` : ' this month'}`, unexpected_costs: 'Looked at unexpected costs', work_expenses: 'Checked work expenses', check_purchase: `Checked if ${a.item || 'it'}${a.price ? ` at £${a.price}` : ''} is affordable`,
   };
   return map[name] || (name.startsWith('propose_') ? 'Prepared a suggestion' : name);
 }

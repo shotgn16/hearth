@@ -37,6 +37,10 @@ export async function renderHome(el) {
       : `<a class="attention calm" href="#/inbox"><span>✓</span> Nothing needs you right now</a>`}
     <div class="grid2">
       <div>
+        ${d.tracker?.count ? `<section style="margin-bottom:26px"><h3>Regular payments this month <a href="#/subscriptions">Tracker</a></h3>
+          <a class="surface pad" href="#/subscriptions" style="display:block;text-decoration:none"><div class="row"><b style="flex:1">${fmt0(d.tracker.paid)} of ${fmt0(d.tracker.expected)} has come out</b><span class="muted small">${d.tracker.paid_count} of ${d.tracker.count}</span></div>
+          <div class="bar" style="margin-top:8px"><i style="width:${d.tracker.expected ? Math.round(d.tracker.paid / d.tracker.expected * 100) : 0}%;background:var(--green)"></i></div>
+          <div class="muted small" style="margin-top:6px">${fmt0(d.tracker.remaining)} still to go${d.tracker.overdue ? ` · <span style="color:var(--amber-ink)">${fmt0(d.tracker.overdue)} late</span>` : ''}${d.work?.to_claim ? ` · ${fmt0(d.work.to_claim)} of work expenses to claim` : ''}</div></a></section>` : ''}
         <section><h3>Coming up <a href="#/calendar">All events</a></h3>
           <div class="surface"><ul class="list">${d.upcoming.length ? d.upcoming.map((u) => `<li><div class="main"><div class="title">${esc(u.title)}</div><div class="meta">${relDay(u.date)} · ${u.type === 'sub' ? 'regular payment' : 'planned cost'}</div></div><div class="amt">${fmt(u.amount)}</div></li>`).join('')
             : '<li class="muted">Nothing due in the next three weeks.</li>'}</ul></div></section>
@@ -74,6 +78,11 @@ export async function renderInbox(el) {
       <div class="main" style="min-width:200px"><div class="title">${esc(i.title)}</div><div class="meta">${esc(i.body)}</div></div>
       <div class="row" style="gap:6px">${actions(i, topCats)}<button class="btn small ghost" data-dismiss="${i.id}" title="Dismiss">✕</button></div></li>`).join('')}</ul></div>`;
   bindActionCards(el);
+  on(el, 'click', '[data-subpaid],[data-subskip]', async (e, b) => {
+    const [id, due] = (b.dataset.subpaid || b.dataset.subskip).split('|');
+    await api('/tracker/mark', { method: 'POST', body: { subscription_id: Number(id), due_date: due, status: b.dataset.subpaid ? 'paid' : 'skipped' } });
+    toast(b.dataset.subpaid ? 'Marked as paid' : 'Skipped for this time'); b.closest('li').remove();
+  });
   on(el, 'click', '[data-aiaccept]', async (e, b) => { const r = await api('/ai/accept-categorise', { method: 'POST' }); toast(`Accepted ${r.accepted} — Hearth will file those merchants the same way from now on`); b.closest('li').remove(); });
   on(el, 'click', '[data-dismiss]', async (e, b) => { await api('/inbox/dismiss', { method: 'POST', body: { id: b.dataset.dismiss } }); b.closest('li').remove(); setBadge(Math.max(0, items.length - 1)); });
   on(el, 'change', 'select[data-cat]', async (e, s) => {
@@ -104,6 +113,10 @@ function actions(i, cats) {
   if (i.type === 'budget') return `<a class="btn small soft" href="#/plan">View</a>`;
   if (i.type === 'event') return `<button class="btn small soft" data-event="${i.event.id}">Set budget</button>`;
   if (i.type === 'note') return `<button class="btn small" data-note="${i.note.id}">Fix</button>`;
+  if (i.type === 'sub_overdue') return `<button class="btn small" data-subpaid="${i.alert.subscription.id}|${i.alert.due_date}">It's been paid</button><button class="btn small soft" data-subskip="${i.alert.subscription.id}|${i.alert.due_date}">Skip this time</button>`;
+  if (i.type === 'sub_after_end') return `<a class="btn small soft" href="#/subscriptions/all">Check it</a>`;
+  if (i.type === 'receipts') return `<a class="btn small" href="#/receipts">Review</a>`;
+  if (i.type === 'work_claim') return `<a class="btn small" href="#/expenses/work">Claim them</a>`;
   if (i.type === 'ai_check') return `<a class="btn small soft" href="#/money?categorised_by=ai">Review</a><button class="btn small" data-aiaccept>Looks right</button>`;
   if (i.type === 'ai_action') return `<span class="act-card" style="border:0;padding:0;margin:0;background:none" data-act="${i.action.id}"><span class="row" style="gap:6px"><button class="btn small" data-confirm="${i.action.id}">Confirm</button></span></span>`;
   return '';

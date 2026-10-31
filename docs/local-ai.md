@@ -45,6 +45,9 @@ What it can look up:
 - the full history at one shop
 - budgets (with projected end-of-period spend), savings goals, subscriptions and bills, the forecast
 - upcoming events, and what similar past events actually cost
+- which regular payments have come out this month and which are still due or late
+- unexpected costs and work expenses waiting to be claimed
+- email receipts waiting for approval and what they were matched to
 - price watches, and whether a purchase is affordable right now (free money, the relevant budget, impact on goals, similar past purchases)
 
 When a next step would help, it **prepares a suggestion card**. Nothing changes until you tap **Confirm**:
@@ -88,6 +91,7 @@ Each can be switched off under **Settings → Local AI → What the AI does for 
 | **Monthly review** | On the 1st (after your morning summary time) it writes a short review of the previous month — how it compared with last month and last year, what drove it, budgets, goals, anything new — and notifies you. All reviews live under **Insights → AI reviews**, where you can also write one for any month. |
 | **Monday check-in** | A two-sentence heads-up about the week ahead. Off by default. |
 | **Receipt scanning** | Reads receipt photos with the vision model and matches them to bank payments within four days by amount. |
+| **Email receipts** | When the rule-based reader isn't sure about a receipt email, the fast model reads it (and the vision model reads photo receipts). Results still wait for your approval. |
 
 ## AI elsewhere in the app
 

@@ -40,7 +40,14 @@ export const opts = (list, sel, label = (x) => x.name, empty) => `${empty !== un
 
 export function $(sel, root = document) { return root.querySelector(sel); }
 export function $$(sel, root = document) { return [...root.querySelectorAll(sel)]; }
-export function on(root, event, sel, fn) { root.addEventListener(event, (e) => { const t = e.target.closest(sel); if (t && root.contains(t)) fn(e, t); }); }
+// Delegated listener. Re-binding the same event + selector on the same element replaces the old handler,
+// so screens that re-render themselves never stack duplicate handlers.
+export function on(root, event, sel, fn) {
+  const key = `${event}|${sel}`; root.__hl ||= {};
+  if (root.__hl[key]) root.removeEventListener(event, root.__hl[key]);
+  const h = (e) => { const t = e.target.closest(sel); if (t && root.contains(t)) fn(e, t); };
+  root.__hl[key] = h; root.addEventListener(event, h);
+}
 
 export function toast(msg, ms = 2600) {
   const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); t.textContent = msg; document.body.append(t);
@@ -80,5 +87,7 @@ export const icons = {
   note: P('<path d="M5 4h10l4 4v12H5z"/><path d="M15 4v4h4M8 12h8M8 16h5"/>'),
   grid: P('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 4v16M15 4v16"/>'),
   list: P('<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>'),
+  alert: P('<path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17h.01"/>'),
+  mail: P('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>'),
   bell: P('<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/>'),
 };

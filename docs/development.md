@@ -12,6 +12,8 @@
 
 ```
 repository.yaml            Home Assistant add-on repository manifest
+.github/workflows/         addon-image.yml builds the ready-made images
+.github/docker/            Dockerfile.addon used for those images
 hearth/
   config.yaml              add-on manifest (ingress, options/schema, permissions)
   Dockerfile               node:22-alpine, amd64 + aarch64
@@ -29,6 +31,9 @@ hearth/
     analytics.js           budgets, goals, insights, forecast, pivot, planner, inbox
     banks.js               SimpleFIN + generic JSON bank feeds
     calendar.js            ICS + HA calendar sync, event cost history
+    tracker.js             subscription & bill tracker (due dates, paid/overdue, history)
+    expenses.js            unexpected costs and work expense claims
+    email.js               IMAP mailbox checks, receipt reading, matching and approval
     ha.js                  Home Assistant client (Supervisor proxy or URL + token)
     notify.js              in-app inbox, HA notify services, ntfy
     ai.js                  Ollama: assistant loop, streaming, features
@@ -60,10 +65,18 @@ Point it at Ollama with `OLLAMA_URL=http://<ip>:11434`.
 
 Home Assistant serves the panel under `/api/hassio_ingress/<token>/`. The server injects `<base href="${X-Ingress-Path}/">` into `index.html`, and every asset and API call in the client is relative. Identity headers (`X-Remote-User-*`) are trusted only from `172.30.32.2`. The service worker is skipped inside ingress.
 
+## Ready-made add-on images
+
+Home Assistant doesn't build Hearth — it downloads `ghcr.io/shotgn16/hearth-{arch}:<version>` (set by `image:` in `hearth/config.yaml`).
+
+`.github/workflows/addon-image.yml` builds those images on every push to `main`, for `amd64` and `aarch64`, using `.github/docker/Dockerfile.addon`. It skips versions that already exist, runs a quick start-up check on the amd64 image, and warns if a package isn't public (Home Assistant pulls without signing in). It can also be run by hand from the Actions tab.
+
+`hearth/Dockerfile` is the plain Docker build used by `docker compose`.
+
 ## Releasing
 
-1. Bump `version` in `hearth/config.yaml` (and `BUILD_VERSION` in the Dockerfile).
+1. Bump `version` in `hearth/config.yaml`.
 2. Add a section to `hearth/CHANGELOG.md`.
-3. Commit and push to `main`. Home Assistant offers the update.
+3. Commit and push to `main`. The workflow builds `ghcr.io/shotgn16/hearth-amd64:<version>` and `…-aarch64:<version>` (a few minutes), then Home Assistant offers the update.
 
-To ship prebuilt images instead of building on each device, publish multi-arch images to GHCR and add `image: ghcr.io/shotgn16/hearth-{arch}` to `config.yaml`.
+The first time the images are published, set both packages to **Public**: GitHub → your profile → **Packages** → `hearth-amd64` / `hearth-aarch64` → **Package settings** → **Change visibility** → **Public**.

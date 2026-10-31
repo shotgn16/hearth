@@ -275,3 +275,30 @@ main:focus, main:focus-visible { outline: none; }
 .bell svg { width: 22px; height: 22px; }
 .bell:hover { background: var(--paper); }
 .bell .badge { top: 2px; right: 0; }
+
+/* ---------- regular payments tracker ---------- */
+.tick { width: 30px; height: 30px; flex: none; border-radius: 50%; border: 2px solid var(--line); background: var(--paper); color: #fff; font-weight: 800; cursor: pointer; display: grid; place-items: center; font-size: .95rem; }
+.tick.paid { background: var(--green); border-color: var(--green); }
+.tick.skipped { background: var(--paper-2); color: var(--ink-3); }
+.tick.overdue { border-color: var(--amber); }
+.tick:hover { border-color: var(--green); }
+.pill { display: inline-block; font-size: .74rem; padding: 2px 8px; border-radius: 999px; background: var(--paper-2); color: var(--ink-2); margin-top: 3px; white-space: nowrap; }
+.pill.ok { background: var(--green-soft); color: var(--green); }
+.pill.late { background: var(--amber-soft); color: var(--amber-ink); font-weight: 700; }
+.pill.due { background: var(--amber-soft); color: var(--amber-ink); }
+td.hc-paid { color: var(--green); font-weight: 600; }
+td.hc-missed { background: var(--amber-soft); color: var(--amber-ink); font-weight: 700; }
+td.hc-part { color: var(--amber-ink); }
+.list > li > input[type=checkbox] { width: 18px; height: 18px; flex: none; }
+
+/* ---------- email receipts ---------- */
+.receipt-list { display: grid; gap: 14px; }
+.receipt .match { background: var(--paper-2); border-radius: 12px; padding: 10px 12px; margin-top: 10px; }
+.match-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.match-grid > div { min-width: 0; } .match-grid b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 600px) { .match-grid { grid-template-columns: 1fr 1fr; } }
+.reasons { margin: 8px 0 0; padding-left: 18px; font-size: .84rem; color: var(--ink-2); }
+.list.pick li { padding: 9px 10px; border-radius: 10px; border-bottom: 0; margin-bottom: 2px; }
+.list.pick li.on { background: var(--green-soft); box-shadow: inset 0 0 0 1.5px var(--green); }
+.email-text { white-space: pre-wrap; font-family: var(--font); font-size: .86rem; background: var(--paper-2); padding: 12px; border-radius: 12px; max-height: 50vh; overflow: auto; }
+.list.pick { max-height: 300px; overflow: auto; }

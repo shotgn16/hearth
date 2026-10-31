@@ -7,7 +7,7 @@ This takes about 15 minutes, most of it waiting for your bank history to import.
 ## 1. Install the add-on
 
 1. In Home Assistant open **Settings → Add-ons → Add-on Store**, then **⋮ → Repositories**, add `https://github.com/shotgn16/hearth` and close the dialog. (Or use the **Add repository** button on the [project page](../README.md).)
-2. Scroll to **Hearth**, open it and press **Install**. The first install builds the add-on on your machine; allow a few minutes on a Raspberry Pi.
+2. Scroll to **Hearth**, open it and press **Install**. Home Assistant downloads a ready-made image for your machine (amd64 or aarch64) — there's nothing to compile.
 
 ## 2. Configure
 

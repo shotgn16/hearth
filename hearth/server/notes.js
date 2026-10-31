@@ -12,7 +12,8 @@ const KEYWORDS = [
   [/petrol|diesel|fuel|charging/i, 'Fuel'], [/train|bus|taxi|uber|parking|tube/i, 'Transport'], [/grocer|food shop|supermarket|milk|bread/i, 'Supermarkets'],
   [/dentist|doctor|prescription|pharmacy|optician/i, 'Health & Pharmacy'], [/present|gift|birthday|wedding|christening|card/i, 'Gifts & Events'],
   [/school|nursery|childcare|kids|trip|uniform|club/i, 'Kids & Family'], [/vet|dog|cat|pet/i, 'Pets'], [/cinema|tickets|concert|gig|theatre/i, 'Entertainment'],
-  [/clothes|shoes|jacket|dress/i, 'Clothing'], [/haircut|barber|salon/i, 'Other'], [/holiday|hotel|flight/i, 'Travel'], [/diy|paint|tools|garden/i, 'Home & DIY'],
+  [/clothes|shoes|jacket|dress/i, 'Clothing'], [/plumber|electrician|boiler|roofer|locksmith|builder|handyman|appliance/i, 'Home & DIY'],
+  [/mechanic|garage|mot\b|tyres?|car repair|breakdown/i, 'Transport'], [/hotel|mileage|conference|client/i, 'Travel'], [/haircut|barber|salon/i, 'Other'], [/holiday|hotel|flight/i, 'Travel'], [/diy|paint|tools|garden/i, 'Home & DIY'],
 ];
 
 function parseWhen(text, now = new Date()) {
@@ -61,9 +62,11 @@ function heuristicParse(hid, text) {
   const events = q.all('SELECT * FROM events WHERE household_id=? AND start BETWEEN ? AND ?', hid, A.iso(A.addDays(date, -3)), A.iso(A.addDays(date, 3)));
   const event = events.find((e) => e.title.toLowerCase().split(/\W+/).some((w) => w.length > 3 && text.toLowerCase().includes(w)));
   const type = wantsToBuy ? 'watch' : isFuture ? 'planned' : 'spend';
+  const work = /\b(work|business|client|expenses?|claim(able)?|reimburs\w*|mileage)\b/i.test(text);
+  const unexpectedCost = /\b(unexpected|emergency|surprise|out of the blue|broke|broken|repair|fixed|replace(ment)?|fine|penalty|vet)\b/i.test(text);
   const confidence = type === 'watch' ? (cleaned.length > 1 ? 0.85 : 0.3) : (amount ? 0.4 : 0) + (category ? 0.3 : 0) + (explicit ? 0.15 : 0.1) + 0.1;
   return { type, amount: amount != null ? (isIncome ? amount : -amount) : null, date: A.iso(date), description: cleaned || text, category_id: category,
-    person_id: person?.id || null, event_id: event?.id || null, confidence: Math.round(confidence * 100) / 100 };
+    person_id: person?.id || null, event_id: event?.id || null, work_expense: work ? 1 : 0, unexpected: unexpectedCost && !work ? 1 : 0, confidence: Math.round(confidence * 100) / 100 };
 }
 
 async function aiParse(hid, text, base) {
@@ -103,6 +106,7 @@ async function fileNote(hid, userId, noteId, p, accountId = null) {
     const res = await ingest(hid, [{ date: p.date, amount: p.amount, description: p.description, merchant: normaliseMerchant(p.description),
       category_id: p.category_id, person_id: p.person_id, event_id: p.event_id, account_id: accountId, notes: 'From quick note' }], { source: 'note', userId });
     created = { kind: 'transaction', id: res.ids[0] };
+    if (created.id && (p.work_expense || p.unexpected)) q.run(`UPDATE transactions SET work_expense=?, claim_status=?, unexpected=? WHERE id=?`, p.work_expense ? 1 : 0, p.work_expense ? 'to_claim' : null, p.unexpected ? 1 : 0, created.id);
     if (created.id) q.run('UPDATE notes SET transaction_id=? WHERE id=?', created.id, noteId);
   }
   q.run(`UPDATE notes SET status='filed', parsed=? WHERE id=?`, JSON.stringify(p), noteId);

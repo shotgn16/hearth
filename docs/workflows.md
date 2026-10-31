@@ -39,6 +39,8 @@ Choose **all** or **any**. Operators: contains, doesn't contain, is, is not, sta
 | Assign to person | |
 | Mark as | one-off, subscription or bill |
 | Colour it | Shows as a stripe on the transaction |
+| Mark as unexpected cost | Shows under Unexpected costs |
+| Mark as work expense | Adds it to Work expenses as *to claim* |
 | Rename merchant | |
 | Add a note | `{merchant}`, `{amount}` are filled in |
 | Send a notification | Title and message (use `{amount}`, `{merchant}`, `{name}`, `{pct}`). Pick which Home Assistant notify services receive it; leave all unticked to use the ones chosen in **Settings → Integrations**. It always appears under the bell in Hearth, and goes to ntfy if that's switched on. |
@@ -50,14 +52,14 @@ Under **Advanced**: the order workflows run in, and "stop other workflows after 
 ## Recipes
 
 - **Tag everything for the kids** — *A transaction comes in*, merchant matches pattern `smyths|clarks|school` → add tag *Kids*, assign to person *Ella*.
-- **Work expenses** — merchant contains `trainline`, weekday between `1,5` → add tag *Work*, colour it blue.
+- **Work travel** — merchant contains `trainline`, weekday between `1,5` → mark as work expense.
 - **Big spend alert to one phone** — *A large transaction comes in*, direction is `out` → notify `mobile_app_jacks_iphone` "{amount} at {merchant}".
 - **Groceries budget nearly gone** — *A budget reaches its warning level*, budget % used ≥ 90 → call `light.turn_on` on the kitchen light in orange.
 - **Before a subscription renews** — *A regular payment is due in 3 days*, merchant is `Netflix` → notify "Netflix renews in {days_until} days".
 
 ## Notifications Hearth sends by itself
 
-Unless a workflow handles the same trigger, Hearth notifies you about: budgets reaching their warning level and 100%, new subscriptions, subscription price changes, watched prices hitting target or a new low, the morning summary (payments due soon, costed events this week, things to check — time set in **Settings → Your data**), and monthly AI reviews.
+Unless a workflow handles the same trigger, Hearth notifies you about: budgets reaching their warning level and 100%, new subscriptions, subscription price changes, watched prices hitting target or a new low, regular payments that are two days late or charge after you ended them, the morning summary (payments due soon, costed events this week, things to check — time set in **Settings → Your data**), and monthly AI reviews.
 
 They go to Hearth's bell, the HA notify services chosen in **Settings → Integrations**, and ntfy if enabled.
 

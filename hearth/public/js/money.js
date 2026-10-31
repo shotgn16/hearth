@@ -1,6 +1,6 @@
 import { state, api, esc, fmt, amt, relDay, niceDate, catIcon, cat, sheet, toast, fail, on, opts, icons, iso, token, loadRefs } from './core.js';
 
-const F = { q: '', from: '', to: '', category_id: '', account_id: '', person_id: '', user_id: '', kind: '', direction: '', uncategorised: '', tag_id: '', categorised_by: '', min: '', max: '', sort: 'date', dir: 'desc' };
+const F = { q: '', from: '', to: '', category_id: '', account_id: '', person_id: '', user_id: '', kind: '', direction: '', uncategorised: '', tag_id: '', categorised_by: '', min: '', max: '', unexpected: '', work_expense: '', subscription_id: '', sort: 'date', dir: 'desc' };
 let mode = null, offset = 0, rows = [], selected = new Set();
 
 export async function renderMoney(el, _parts, qs) {
@@ -18,7 +18,7 @@ export async function renderMoney(el, _parts, qs) {
       ${chip('This month', { from: iso(new Date(new Date().getFullYear(), new Date().getMonth(), 1)), to: '' })}
       ${chip('Last month', { from: iso(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)), to: iso(new Date(new Date().getFullYear(), new Date().getMonth(), 0)) })}
       ${chip('This year', { from: `${new Date().getFullYear()}-01-01`, to: '' })}
-      ${chip('Money in', { direction: 'in' })}${chip('Subscriptions', { kind: 'subscription' })}${chip('Bills', { kind: 'bill' })}${chip('One-offs', { kind: 'one_off' })}${chip('Uncategorised', { uncategorised: '1' })}${chip('Filed by AI', { categorised_by: 'ai' })}
+      ${chip('Money in', { direction: 'in' })}${chip('Subscriptions', { kind: 'subscription' })}${chip('Bills', { kind: 'bill' })}${chip('One-offs', { kind: 'one_off' })}${chip('Uncategorised', { uncategorised: '1' })}${chip('Unexpected', { unexpected: '1' })}${chip('Work expenses', { work_expense: '1' })}${chip('Filed by AI', { categorised_by: 'ai' })}
       ${views.map((v) => `<button class="chip" data-view="${v.id}">★ ${esc(v.name)}</button>`).join('')}
       <button class="chip" data-filters>More filters</button>
     </div>
@@ -81,7 +81,7 @@ function listView(el) {
   box.onclick = (e) => { const li = e.target.closest('[data-tx]'); if (li) txSheet(rows.find((r) => r.id === Number(li.dataset.tx)), () => load(el, true)); };
 }
 const li = (r) => `<li class="tap" data-tx="${r.id}" ${r.color ? `style="box-shadow:inset 3px 0 0 ${r.color};padding-left:8px"` : ''}>${catIcon(cat(r.category_id))}
-  <div class="main"><div class="title">${esc(r.merchant || r.description)}</div><div class="meta">${esc(r.category_name || 'Uncategorised')}${r.person_name ? ` · ${esc(r.person_name)}` : ''}${r.event_title ? ` · ${esc(r.event_title)}` : ''}${r.kind !== 'one_off' ? ` · ${r.kind === 'bill' ? 'bill' : 'subscription'}` : ''}${r.pending ? ' · pending' : ''}
+  <div class="main"><div class="title">${esc(r.merchant || r.description)}</div><div class="meta">${esc(r.category_name || 'Uncategorised')}${r.person_name ? ` · ${esc(r.person_name)}` : ''}${r.event_title ? ` · ${esc(r.event_title)}` : ''}${r.kind !== 'one_off' ? ` · ${r.kind === 'bill' ? 'bill' : 'subscription'}` : ''}${r.pending ? ' · pending' : ''}${r.unexpected ? ' · <span class="tag" style="background:var(--amber-soft);color:var(--amber-ink)">unexpected</span>' : ''}${r.work_expense ? ` · <span class="tag" style="background:var(--paper-2);color:var(--ink-2)">work · ${r.claim_status === 'paid_back' ? 'paid back' : r.claim_status === 'claimed' ? 'claimed' : 'to claim'}</span>` : ''}
   ${r.tags.map((t) => `<span class="tag" style="background:${t.color}22;color:${t.color}">${esc(t.name)}</span>`).join(' ')}</div></div><div class="amt">${amt(r.amount)}</div></li>`;
 
 // Spreadsheet mode: inline editing, sort by header, multi-select and bulk changes
@@ -101,7 +101,7 @@ function gridView(el) {
 </tr>`).join('')}</tbody>
     <tfoot><tr><td></td><td colspan="2">${rows.length} shown</td><td class="r money">${fmt(rows.reduce((s, r) => s + r.amount, 0))}</td><td colspan="5"></td></tr></tfoot></table></div>`;
   on(box, 'click', '[data-sort]', (e, th) => { F.dir = F.sort === th.dataset.sort && F.dir === 'desc' ? 'asc' : 'desc'; F.sort = th.dataset.sort; load(el, true); });
-  box.addEventListener('change', async (e) => {
+  box.onchange = async (e) => {
     const tr = e.target.closest('tr[data-id]'); const id = Number(tr?.dataset.id);
     if (e.target.matches('[data-all]')) { rows.forEach((r) => (e.target.checked ? selected.add(r.id) : selected.delete(r.id))); gridView(el); return bulkBar(el); }
     if (e.target.matches('[data-sel]')) { e.target.checked ? selected.add(id) : selected.delete(id); tr.classList.toggle('sel', e.target.checked); return bulkBar(el); }
@@ -112,7 +112,7 @@ function gridView(el) {
       Object.assign(rows.find((x) => x.id === id), { [f]: v });
       toast(f === 'category_id' && r.also_updated > 1 ? `Saved — ${r.also_updated - 1} more from that merchant updated too` : 'Saved', 1400);
     } catch (err) { fail(err); }
-  });
+  };
   bulkBar(el);
 }
 
@@ -175,7 +175,7 @@ export async function txSheet(t, done) {
   const near = events.filter((e) => Math.abs(new Date(e.start) - new Date(t.date)) < 45 * 86400000);
   const { el, close } = sheet(`<div class="row" style="gap:14px;margin-bottom:14px">${catIcon(cat(t.category_id), 48)}<div style="flex:1;min-width:0"><h2 style="margin:0">${esc(t.merchant)}</h2>
       <div class="muted small">${relDay(t.date)} · ${esc(t.account_name || 'No account')} · from ${esc(t.source)}</div></div><div style="font-size:1.4rem;font-weight:700">${amt(t.amount)}</div></div>
-    <p class="muted small" style="margin-top:0">${esc(t.description)}</p>
+    <p class="muted small" style="margin-top:0">${esc(t.description)}</p><div id="txrcpt"></div>
     <form class="kv">
       <label class="f"><span>Category</span><select name="category_id">${opts(state.cats, t.category_id, (c) => `${c.icon} ${c.name}`, 'Uncategorised')}</select></label>
       <label class="f"><span>For</span><select name="person_id">${opts(state.people, t.person_id, (p) => p.name, 'Everyone')}</select></label>
@@ -185,14 +185,25 @@ export async function txSheet(t, done) {
       <label class="f"><span>Colour</span><div class="row"><input type="color" name="color" value="${t.color || '#d9962b'}"><label class="row small"><input type="checkbox" name="nocolor" ${t.color ? '' : 'checked'}> none</label></div></label>
       <label class="f" style="grid-column:1/-1"><span>Notes</span><input type="text" name="notes" value="${esc(t.notes || '')}"></label>
       <div class="f" style="grid-column:1/-1"><span class="small muted" style="font-weight:600">Tags</span><div class="chips" style="margin-top:6px">${state.tags.map((g) => `<button type="button" class="chip ${t.tags.some((x) => x.id === g.id) ? 'on' : ''}" data-tag="${g.id}"><i class="dot" style="background:${g.color}"></i>${esc(g.name)}</button>`).join('')}<button type="button" class="chip" data-newtag>+ New tag</button></div></div>
+      <div class="row" style="grid-column:1/-1;gap:18px;margin-bottom:6px">
+        <label class="row" style="gap:8px"><label class="switch"><input type="checkbox" name="unexpected" ${t.unexpected ? 'checked' : ''}><i></i></label> Unexpected cost</label>
+        <label class="row" style="gap:8px"><label class="switch"><input type="checkbox" name="work_expense" ${t.work_expense ? 'checked' : ''}><i></i></label> Work expense</label>
+        <select name="claim_status" style="width:auto" ${t.work_expense ? '' : 'disabled'}>${[['to_claim', 'To claim'], ['claimed', 'Claimed'], ['paid_back', 'Paid back']].map(([v, l]) => `<option value="${v}" ${(t.claim_status || 'to_claim') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
       <label class="row small" style="grid-column:1/-1"><input type="checkbox" name="learn" checked> Use this category for every transaction from ${esc(t.merchant)}</label>
       <div class="row" style="grid-column:1/-1"><button type="button" class="btn ghost" data-del>Delete</button><span class="spacer"></span><button class="btn">Save</button></div></form>`);
+  api(`/transactions/${t.id}/receipts`).then((rs) => {
+    if (!rs.length) return;
+    el.querySelector('#txrcpt').innerHTML = `<div class="parsed" style="margin:0 0 14px">${rs.map((r) => `<div class="small">🧾 <b>Receipt from ${esc(r.merchant)}</b>${r.order_ref ? ` · ref ${esc(r.order_ref)}` : ''}${r.attachments.map((a) => ` · <a href="api/email/receipts/${r.id}/file/${encodeURIComponent(a.name)}?t=${token()}" target="_blank" rel="noopener">${esc(a.name)}</a>`).join('')} · <a href="#/receipts/approved">details</a></div>`).join('')}</div>`;
+  }).catch(() => {});
+  el.querySelector('[name=work_expense]').onchange = (e) => { el.querySelector('[name=claim_status]').disabled = !e.target.checked; };
   on(el, 'click', '[data-tag]', async (e, b) => { const on_ = b.classList.toggle('on'); await api(`/transactions/${t.id}`, { method: 'PATCH', body: on_ ? { add_tag: Number(b.dataset.tag) } : { remove_tag: Number(b.dataset.tag) } }); });
   on(el, 'click', '[data-newtag]', async () => { const name = prompt('Tag name'); if (!name) return; const g = await api('/tags', { method: 'POST', body: { name } }); await api(`/transactions/${t.id}`, { method: 'PATCH', body: { add_tag: g.id } }); await loadRefs(); close(); done?.(); });
   el.querySelector('[data-del]').onclick = async () => { if (!confirm('Delete this transaction?')) return; await api(`/transactions/${t.id}`, { method: 'DELETE' }); close(); done?.(); };
   el.querySelector('form').onsubmit = async (e) => {
     e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
-    const body = { person_id: f.person_id ? Number(f.person_id) : '', event_id: f.event_id ? Number(f.event_id) : '', kind: f.kind, merchant: f.merchant, notes: f.notes, color: f.nocolor ? '' : f.color, learn: !!f.learn, apply_to_merchant: !!f.learn };
+    const body = { person_id: f.person_id ? Number(f.person_id) : '', event_id: f.event_id ? Number(f.event_id) : '', kind: f.kind, merchant: f.merchant, notes: f.notes, color: f.nocolor ? '' : f.color, learn: !!f.learn, apply_to_merchant: !!f.learn,
+      unexpected: f.unexpected ? 1 : 0, work_expense: f.work_expense ? 1 : 0 };
+    if (f.work_expense && t.work_expense) body.claim_status = f.claim_status || 'to_claim';
     if (String(f.category_id || '') !== String(t.category_id || '')) body.category_id = f.category_id ? Number(f.category_id) : '';
     const r = await api(`/transactions/${t.id}`, { method: 'PATCH', body });
     close(); toast(r.also_updated > 1 ? `Saved — ${r.also_updated - 1} more from ${t.merchant} updated` : 'Saved'); done?.();

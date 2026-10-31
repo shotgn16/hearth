@@ -6,6 +6,7 @@ const SECTIONS = [
   ['import', 'Import statements', 'CSV, OFX or QIF files from any bank — years of history'],
   ['categories', 'Categories & tags', 'Names, colours and icons'],
   ['workflows', 'Workflows', 'When this happens, do that — automatically'],
+  ['email', 'Email receipts', 'Mailboxes Hearth checks for receipts, invoices and bills'],
   ['calendars', 'Calendars', 'Google, Outlook and Exchange — kept as a local copy'],
   ['ai', 'Local AI', 'Ollama models, what the AI does for you, activity'],
   ['integrations', 'Integrations', 'Home Assistant, ntfy, price comparison'],
@@ -19,7 +20,7 @@ export async function renderSettings(el, parts) {
     return;
   }
   document.querySelector('.topbar h1').textContent = SECTIONS.find((x) => x[0] === s)?.[1] || 'Settings';
-  return ({ people, banks, import: importer, categories, workflows, calendars, integrations, data, ai: aiSettings })[s]?.(el);
+  return ({ email: emailSettings, people, banks, import: importer, categories, workflows, calendars, integrations, data, ai: aiSettings })[s]?.(el);
 }
 
 // ---------- people ----------
@@ -161,13 +162,13 @@ async function categories(el) {
     <p class="muted small">"Transfer" categories are left out of spending totals — use them for moving money between your own accounts.</p></section>
     <section><h3>Tags <button class="link btn small soft" data-add="tags">Add</button></h3><div class="surface"><ul class="list">${state.tags.map((t) => row(t, 'tags')).join('') || '<li class="muted">Tags cut across categories: "Holiday 2026", "Work expenses", "Wedding".</li>'}</ul></div></section></div>`;
   const patch = (kind, id, body) => api(`/${kind}/${id}`, { method: 'PATCH', body }).then(loadRefs).catch(fail);
-  el.addEventListener('change', (e) => {
+  el.onchange = (e) => {
     const t = e.target, kind = t.dataset.kind || 'categories';
     if (t.dataset.icon) patch('categories', t.dataset.icon, { icon: t.value });
     if (t.dataset.color) patch(kind, t.dataset.color, { color: t.value });
     if (t.dataset.name) patch(kind, t.dataset.name, { name: t.value });
     if (t.dataset.ckind) patch('categories', t.dataset.ckind, { kind: t.value });
-  });
+  };
   on(el, 'click', '[data-add]', async (e, b) => { const name = prompt('Name'); if (!name) return; await api(`/${b.dataset.add}`, { method: 'POST', body: { name } }).catch(fail); categories(el); });
   on(el, 'click', '[data-del]', async (e, b) => { if (confirm('Delete? Transactions keep their data but lose this label.')) { await api(`/${b.dataset.kind}/${b.dataset.del}`, { method: 'DELETE' }); categories(el); } });
 }
@@ -180,6 +181,7 @@ const FIELDS = [['merchant', 'Merchant'], ['description', 'Description'], ['abs_
   ['person_id', 'Person'], ['user_id', 'User'], ['kind', 'Kind'], ['weekday', 'Weekday (0=Sun)'], ['day_of_month', 'Day of month'], ['pct', 'Budget % used'], ['price', 'Price'], ['days_until', 'Days until']];
 const OPS = [['contains', 'contains'], ['not_contains', "doesn't contain"], ['equals', 'is'], ['not_equals', 'is not'], ['starts_with', 'starts with'], ['regex', 'matches pattern'], ['gt', '>'], ['gte', '≥'], ['lt', '<'], ['lte', '≤'], ['between', 'between (a,b)'], ['in', 'one of (a,b,c)'], ['is_empty', 'is empty']];
 const ACTIONS = [['set_category', 'Set category'], ['add_tag', 'Add tag'], ['set_person', 'Assign to person'], ['set_kind', 'Mark as'], ['set_color', 'Colour it'], ['set_merchant', 'Rename merchant'], ['append_note', 'Add a note'], ['notify', 'Send a notification'],
+  ['mark_unexpected', 'Mark as unexpected cost'], ['mark_work_expense', 'Mark as work expense (to claim)'],
   ['ha_event', 'Fire a Home Assistant event'], ['ha_service', 'Call a Home Assistant service']];
 
 async function workflows(el) {
@@ -222,6 +224,7 @@ async function ruleSheet(r, done) {
         <div class="small muted" style="margin-top:6px">Send to (leave all unticked to use the services chosen in Settings → Integrations; it always appears in Hearth's inbox):</div><div class="chips" style="margin-top:6px">
         ${haServices.map((s) => `<button type="button" class="chip ${(a.ha_services || []).includes(s) ? 'on' : ''}" data-ha="${i}:${s}">${esc(s.replace('notify.', ''))}</button>`).join('')}
         ${!haServices.length ? '<span class="muted small">Connect Home Assistant (Settings → Integrations) to send to your phones, or switch on ntfy.</span>' : ''}</div>`;
+      case 'mark_unexpected': case 'mark_work_expense': return '<span class="muted small">No settings needed.</span>';
       case 'ha_event': return `<input type="text" data-av="${i}" value="${esc(a.value || 'hearth_event')}" placeholder="Event type, e.g. hearth_big_spend"><div class="small muted">Use it as an Event trigger in a Home Assistant automation. Data includes merchant, amount, category_id and date.</div>`;
       case 'ha_service': return `<input type="text" data-av="${i}" value="${esc(a.value || '')}" placeholder="light.turn_on"><input type="text" data-ad="${i}" value="${esc(a.data || '')}" placeholder='{"entity_id":"light.hallway","color_name":"orange"}'><div class="small muted">Data is JSON; {merchant} and {amount} are filled in.</div>`;
       default: return `<input type="text" data-av="${i}" value="${esc(a.value ?? '')}">`;
@@ -256,6 +259,70 @@ async function ruleSheet(r, done) {
     const body = { name: f.get('name'), trigger: f.get('trigger'), match_all: Number(f.get('match_all')), priority: Number(f.get('priority')), stop_processing: f.get('stop_processing') ? 1 : 0,
       conditions: conds.filter((c) => c.op === 'is_empty' || c.value !== ''), actions: acts.map((a) => (['set_category', 'set_person'].includes(a.type) ? { ...a, value: Number(a.value) } : a)) };
     try { await api(r.id ? `/rules/${r.id}` : '/rules', { method: r.id ? 'PATCH' : 'POST', body }); close(); toast('Workflow saved'); done(); } catch (err) { fail(err); }
+  };
+}
+
+// ---------- email receipts ----------
+const PROVIDERS = {
+  gmail: { label: 'Gmail', host: 'imap.gmail.com', port: 993, help: 'Turn on 2-Step Verification, then create an app password at myaccount.google.com/apppasswords and paste it here. Tip: make a "Receipts" label with a filter and check only that.' },
+  icloud: { label: 'iCloud Mail', host: 'imap.mail.me.com', port: 993, help: 'Create an app-specific password at account.apple.com → Sign-In and Security → App-Specific Passwords. Your username is your full iCloud email address.' },
+  yahoo: { label: 'Yahoo Mail', host: 'imap.mail.yahoo.com', port: 993, help: 'Generate an app password in Yahoo Account Security → Generate app password.' },
+  fastmail: { label: 'Fastmail', host: 'imap.fastmail.com', port: 993, help: 'Create an app password in Settings → Privacy & Security → Integrations (IMAP access).' },
+  outlook: { label: 'Outlook.com / Microsoft 365', host: 'outlook.office365.com', port: 993, help: 'Microsoft has switched off password sign-in for IMAP on most accounts and Hearth doesn\'t support Microsoft\'s OAuth sign-in yet. The reliable route: set an Outlook rule that forwards receipts to a mailbox above (or a dedicated one), and connect that instead.' },
+  other: { label: 'Other (IMAP)', host: '', port: 993, help: 'Use your provider\'s IMAP server, port 993 with SSL. A dedicated receipts mailbox or folder keeps things fast and private.' },
+};
+async function emailSettings(el) {
+  const [list, s] = await Promise.all([api('/email/accounts'), api('/settings')]);
+  el.innerHTML = `<p class="muted" style="margin-top:0">Hearth checks these mailboxes for receipts, invoices and bills, reads the amount, date, references and items (including PDF attachments), and matches each to a bill, payment and account. <b>Nothing is applied until you approve it</b> in <a href="#/receipts">Email receipts</a>. Only likely receipts are downloaded; everything stays on this server.</p>
+    ${list.length ? `<div class="surface" style="margin-bottom:20px"><ul class="list">${list.map((a) => `<li style="flex-wrap:wrap"><div class="main" style="min-width:220px"><div class="title">${esc(a.name || a.username)}</div>
+      <div class="meta">${esc(a.username)} · ${esc(a.folders.join(', '))} · ${a.last_sync ? `checked ${relDay(a.last_sync)} ${new Date(a.last_sync).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'not checked yet'}${a.last_error ? ` · ⚠ ${esc(a.last_error)}` : ''}</div></div>
+      <div class="row" style="gap:6px"><label class="switch" title="Check automatically"><input type="checkbox" data-en="${a.id}" ${a.enabled ? 'checked' : ''}><i></i></label><button class="btn small soft" data-sync="${a.id}">Check now</button><button class="btn small ghost" data-edit="${a.id}">Edit</button><button class="btn small ghost" data-del="${a.id}">Remove</button></div></li>`).join('')}</ul></div>` : ''}
+    <div class="row" style="margin-bottom:20px"><button class="btn" data-add>Connect a mailbox</button><span class="spacer"></span>
+      <label class="row small">Check every <select id="every" style="width:auto">${[15, 30, 60, 180, 720].map((m) => `<option value="${m}" ${Number(s.email_check_minutes || 30) === m ? 'selected' : ''}>${m < 60 ? `${m} minutes` : m === 60 ? 'hour' : `${m / 60} hours`}</option>`).join('')}</select></label></div>`;
+  el.querySelector('#every').onchange = (e) => api('/settings', { method: 'PUT', body: { email_check_minutes: Number(e.target.value) } }).then(() => toast('Saved'));
+  el.querySelector('[data-add]').onclick = () => mailboxSheet(null, () => emailSettings(el));
+  on(el, 'click', '[data-edit]', (e, b) => mailboxSheet(list.find((a) => a.id === Number(b.dataset.edit)), () => emailSettings(el)));
+  on(el, 'change', '[data-en]', (e, i) => api(`/email/accounts/${i.dataset.en}`, { method: 'PATCH', body: { enabled: i.checked ? 1 : 0 } }));
+  on(el, 'click', '[data-sync]', async (e, b) => { b.disabled = true; b.textContent = 'Checking…'; try { const r = await api(`/email/accounts/${b.dataset.sync}/sync`, { method: 'POST', body: {} }); toast(`Looked at ${r.scanned} new emails · ${r.found} receipts`); } catch (err) { fail(err); } emailSettings(el); });
+  on(el, 'click', '[data-del]', async (e, b) => { if (!confirm('Remove this mailbox? Receipts already found stay in Hearth.')) return; await api(`/email/accounts/${b.dataset.del}`, { method: 'DELETE' }); emailSettings(el); });
+}
+
+function mailboxSheet(a, done) {
+  const isNew = !a;
+  a ||= { name: '', host: '', port: 993, secure: 1, username: '', password: '', folders: ['INBOX'], lookback_days: 90, user_id: state.me.user.id };
+  const guess = Object.entries(PROVIDERS).find(([, p]) => p.host && p.host === a.host)?.[0] || (isNew ? 'gmail' : 'other');
+  const { el, close } = sheet(`<h2>${isNew ? 'Connect a mailbox' : 'Edit mailbox'}</h2><form class="kv" id="mf">
+    <label class="f"><span>Provider</span><select name="provider">${Object.entries(PROVIDERS).map(([k, p]) => `<option value="${k}" ${k === guess ? 'selected' : ''}>${p.label}</option>`).join('')}</select></label>
+    <label class="f"><span>Name</span><input type="text" name="name" value="${esc(a.name || '')}" placeholder="Alex's Gmail"></label>
+    <p class="small muted" id="phelp" style="grid-column:1/-1;margin:0 0 6px"></p>
+    <label class="f"><span>Email / username</span><input type="text" name="username" value="${esc(a.username)}" required autocomplete="off"></label>
+    <label class="f"><span>App password</span><input type="password" name="password" value="${esc(a.password || '')}" ${isNew ? 'required' : ''} autocomplete="new-password"></label>
+    <label class="f"><span>IMAP server</span><input type="text" name="host" value="${esc(a.host)}" required></label>
+    <label class="f"><span>Port</span><input type="number" name="port" value="${a.port}"></label>
+    <label class="f" style="grid-column:1/-1"><span>Folders to check</span><div class="chips" id="folders" style="margin-top:6px">${a.folders.map((f) => `<button type="button" class="chip on" data-f="${esc(f)}">${esc(f)}</button>`).join('')}<span class="muted small">Press "Test" to choose from your folders</span></div></label>
+    <label class="f"><span>On first check, look back</span><select name="lookback_days">${[[30, '1 month'], [90, '3 months'], [180, '6 months'], [365, '1 year'], [730, '2 years']].map(([v, l]) => `<option value="${v}" ${Number(a.lookback_days) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    <label class="f"><span>Whose mailbox</span><select name="user_id">${opts(state.users, a.user_id)}</select></label>
+    <details class="adv" style="grid-column:1/-1"><summary>Advanced</summary><label class="row small" style="margin-top:8px"><input type="checkbox" name="secure" ${a.secure ? 'checked' : ''}> Use SSL/TLS (port 993)</label>
+      <label class="row small"><input type="checkbox" name="allow_self_signed" ${a.allow_self_signed ? 'checked' : ''}> Allow a self-signed certificate (your own mail server)</label></details>
+    <div class="row" style="grid-column:1/-1"><span class="small" id="tres"></span><span class="spacer"></span><button type="button" class="btn soft" data-test>Test</button><button class="btn">${isNew ? 'Connect' : 'Save'}</button></div></form>`, { wide: true });
+  const f = el.querySelector('#mf');
+  const setProv = (first) => { const p = PROVIDERS[f.provider.value]; el.querySelector('#phelp').textContent = p.help; if (!first || isNew) { if (p.host) f.host.value = p.host; f.port.value = p.port; } };
+  f.provider.onchange = () => setProv(false); setProv(true);
+  on(el, 'click', '[data-f]', (e, b) => b.classList.toggle('on'));
+  const body = () => { const d = Object.fromEntries(new FormData(f)); return { id: a.id, name: d.name || d.username, host: d.host.trim(), port: Number(d.port) || 993, secure: d.secure ? 1 : 0, allow_self_signed: d.allow_self_signed ? 1 : 0, username: d.username.trim(), password: d.password, user_id: Number(d.user_id) || null, lookback_days: Number(d.lookback_days), folders: [...el.querySelectorAll('[data-f].on')].map((x) => x.dataset.f) }; };
+  el.querySelector('[data-test]').onclick = async (e) => {
+    const t = el.querySelector('#tres'); e.target.disabled = true; t.textContent = 'Connecting…';
+    try {
+      const r = await api('/email/accounts/test', { method: 'POST', body: body() });
+      const chosen = new Set([...el.querySelectorAll('[data-f].on')].map((x) => x.dataset.f));
+      el.querySelector('#folders').innerHTML = r.folders.map((x) => `<button type="button" class="chip ${chosen.has(x) ? 'on' : ''}" data-f="${esc(x)}">${esc(x)}</button>`).join('');
+      t.innerHTML = '<span style="color:var(--green)">✓ Connected — pick the folders to check</span>';
+    } catch (err) { t.textContent = err.message; }
+    e.target.disabled = false;
+  };
+  f.onsubmit = async (e) => {
+    e.preventDefault(); const b = body(); if (!b.folders.length) return toast('Pick at least one folder');
+    try { await api(isNew ? '/email/accounts' : `/email/accounts/${a.id}`, { method: isNew ? 'POST' : 'PATCH', body: b }); close(); toast(isNew ? 'Connected — checking for receipts now' : 'Saved'); done(); } catch (err) { fail(err); }
   };
 }
 

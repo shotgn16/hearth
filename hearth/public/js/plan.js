@@ -46,6 +46,7 @@ function budgetSheet(b, done) {
     <label class="f" data-show="person"><span>Person</span><select name="person_id">${opts(state.people, b.person_id)}</select></label>
     <label class="f" data-show="custom"><span>Start</span><input type="date" name="start_date" value="${b.start_date || iso()}"></label>
     <label class="f" data-show="custom"><span>End</span><input type="date" name="end_date" value="${b.end_date || ''}"></label>
+    <label class="f"><span>Count</span><select name="flag"><option value="">All matching spending</option><option value="unexpected" ${b.flag === 'unexpected' ? 'selected' : ''}>Only unexpected costs</option><option value="not_unexpected" ${b.flag === 'not_unexpected' ? 'selected' : ''}>Leave out unexpected costs</option><option value="work" ${b.flag === 'work' ? 'selected' : ''}>Only work expenses</option></select></label>
     <label class="f"><span>Warn me at (%)</span><input type="number" name="alert_pct" value="${b.alert_pct}"></label>
     <label class="f"><span>Colour</span><input type="color" name="color" value="${b.color}"></label></div>
     <div class="f"><span class="small muted" style="font-weight:600">Categories (leave empty for all spending)</span><div class="chips" style="margin-top:8px">${state.cats.filter((c) => c.kind === 'expense').map((c) => `<button type="button" class="chip ${selCats.includes(c.id) ? 'on' : ''}" data-c="${c.id}">${esc(c.icon)} ${esc(c.name)}</button>`).join('')}</div></div>
@@ -59,7 +60,7 @@ function budgetSheet(b, done) {
     e.preventDefault(); const d = Object.fromEntries(new FormData(f));
     const body = { ...d, amount: Number(d.amount), alert_pct: Number(d.alert_pct), category_ids: [...el.querySelectorAll('[data-c].on')].map((c) => Number(c.dataset.c)),
       user_id: d.scope === 'individual' ? Number(d.user_id) : null, person_id: d.scope === 'person' ? Number(d.person_id) : null,
-      start_date: d.period === 'custom' ? d.start_date : null, end_date: d.period === 'custom' ? d.end_date : null };
+      start_date: d.period === 'custom' ? d.start_date : null, end_date: d.period === 'custom' ? d.end_date : null, flag: d.flag || null };
     try { await api(b.id ? `/budgets/${b.id}` : '/budgets', { method: b.id ? 'PATCH' : 'POST', body }); close(); toast('Budget saved'); done(); } catch (err) { fail(err); }
   };
 }
@@ -123,14 +124,14 @@ async function planner(box) {
   on(box, 'click', '[data-y]', (e, b) => { plannerYear += Number(b.dataset.y); planner(box); });
   box.querySelector('#pu').onchange = (e) => { plannerUser = Number(e.target.value); planner(box); };
   box.querySelector('[data-fill]').onclick = async () => { await api('/planner/autofill', { method: 'POST', body: { year: plannerYear, user_id: plannerUser } }); toast('Filled empty future months from your recent averages'); planner(box); };
-  box.addEventListener('change', async (e) => {
+  box.onchange = async (e) => {
     const i = e.target; if (!i.dataset.m) return;
     const kind = state.cats.find((c) => c.id === Number(i.dataset.c))?.kind;
     const v = i.value === '' ? null : (kind === 'income' ? 1 : -1) * Math.abs(Number(i.value));
     try { await api('/planner', { method: 'PUT', body: { month: i.dataset.m, category_id: Number(i.dataset.c), user_id: plannerUser, amount: v } }); } catch (err) { fail(err); }
-  });
+  };
   // spreadsheet-style keyboard: Enter moves down, arrows move between cells
-  box.addEventListener('keydown', (e) => {
+  box.onkeydown = (e) => {
     const i = e.target; if (!i.dataset?.m) return;
     const td = i.closest('td'), tr = td.parentElement, idx = [...tr.children].indexOf(td);
     let target = null;
@@ -138,5 +139,5 @@ async function planner(box) {
     if (e.key === 'ArrowUp' && e.altKey) target = tr.previousElementSibling?.children[idx];
     if (e.key === 'Tab') return;
     if (target) { e.preventDefault(); target.querySelector('input')?.focus(); target.querySelector('input')?.select(); }
-  });
+  };
 }

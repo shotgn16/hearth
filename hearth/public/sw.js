@@ -1,7 +1,7 @@
 // Service worker (standalone installs only): the app shell works offline and the last API responses stay readable offline.
-const SHELL = 'hearth-shell-v2';
+const SHELL = 'hearth-shell-v4';
 const SHELL_FILES = ['./', 'styles.css', 'icon.svg', 'manifest.webmanifest', 'js/app.js', 'js/core.js', 'js/charts.js',
-  'js/home.js', 'js/money.js', 'js/plan.js', 'js/insights.js', 'js/more.js', 'js/settings.js', 'js/ask.js'];
+  'js/home.js', 'js/money.js', 'js/plan.js', 'js/insights.js', 'js/more.js', 'js/settings.js', 'js/ask.js', 'js/subs.js', 'js/expenses.js', 'js/receipts.js'];
 const ASSETS = SHELL_FILES.map((f) => new URL(f, self.registration.scope).href);
 
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(SHELL).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())); });

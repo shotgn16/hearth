@@ -22,6 +22,7 @@ async function afterNewTransactions(hid) {
     }
   }
   const subs = detectSubscriptions(hid);
+  const tracker = require('./tracker'); tracker.linkManual(hid); tracker.refreshNextDates(hid);
   for (const s of subs.filter((x) => x.isNew)) {
     const m = await runRules(hid, 'subscription_detected', { ...s, merchant: s.merchant, amount: -s.amount });
     if (!m.length) await notify(hid, { title: 'New subscription spotted', body: `${s.merchant} — £${s.amount.toFixed(2)} ${s.cadence}`, url: '/#/subscriptions' });
@@ -56,7 +57,7 @@ async function dailyDigest(hid) {
   const cfg = getSetting(hid, 'digest', { enabled: true, hour: 8 });
   if (!cfg.enabled || new Date().getHours() < cfg.hour) return;
   setSetting(hid, 'digest_last', today);
-  const due = q.all(`SELECT * FROM subscriptions WHERE household_id=? AND status='active' AND next_date BETWEEN ? AND ?`, hid, today, A.iso(A.addDays(new Date(), 3)));
+  const due = q.all(`SELECT * FROM subscriptions WHERE household_id=? AND status IN ('active','cancelling') AND next_date BETWEEN ? AND ?`, hid, today, A.iso(A.addDays(new Date(), 3)));
   for (const s of due) await runRules(hid, 'subscription_due', { ...s, days_until: Math.round((new Date(s.next_date) - new Date(today)) / 86400000), amount: -s.amount });
   const events = q.all(`SELECT * FROM events WHERE household_id=? AND substr(start,1,10) BETWEEN ? AND ?`, hid, today, A.iso(A.addDays(new Date(), 7)));
   for (const e of events) await runRules(hid, 'event_upcoming', { ...e, merchant: e.title, amount: -(e.budget || e.estimated_cost || 0), days_until: Math.round((new Date(e.start) - new Date(today)) / 86400000) });
@@ -97,6 +98,18 @@ async function sensors(hid) {
   await ha.publishSensors(hid, { ...f, monthSpend, inbox: A.inbox(hid).filter((i) => !i.soft).length, next });
 }
 
+// Tell people (once) when a payment is late or something charged after it was ended
+async function trackerAlerts(hid) {
+  const sent = getSetting(hid, 'tracker_alerts_sent', {});
+  for (const a of require('./tracker').alerts(hid)) {
+    const key = a.kind === 'overdue' ? `o:${a.subscription.id}:${a.due_date}` : `e:${a.subscription.id}:${a.paid_date}`;
+    if (sent[key]) continue; sent[key] = 1;
+    if (a.kind === 'overdue') await notify(hid, { title: `${a.subscription.display} hasn't come out`, body: `£${a.expected.toFixed(2)} was due on ${a.due_date}. Mark it paid or skipped in Regular payments.`, url: '/#/subscriptions' });
+    else await notify(hid, { title: `${a.subscription.display} charged after you ended it`, body: `£${a.paid_amount.toFixed(2)} on ${a.paid_date}`, url: '/#/subscriptions' });
+  }
+  setSetting(hid, 'tracker_alerts_sent', Object.fromEntries(Object.entries(sent).slice(-500)));
+}
+
 let running = false;
 async function tick() {
   if (running) return; running = true;
@@ -109,12 +122,21 @@ async function tick() {
         if (hoursSince(c.last_sync) >= syncHours) { try { const r = await syncConnection(c); if (r.added) changed = true; } catch (e) { log.warning('bank sync', e.message); } }
       }
       if (changed) await afterNewTransactions(hid);
+      // email receipts: check each mailbox, then re-check pending suggestions (the bank payment may have arrived since)
+      let newReceipts = 0;
+      for (const acct of q.all('SELECT * FROM email_accounts WHERE household_id=? AND enabled=1', hid)) {
+        if (hoursSince(acct.last_sync) * 60 >= getSetting(hid, 'email_check_minutes', 30)) { try { newReceipts += (await require('./email').syncAccount(acct)).found; } catch (e) { log.warning('email sync', acct.name, e.message); } }
+      }
+      if (changed || newReceipts) require('./email').rematchPending(hid);
+      if (newReceipts) await notify(hid, { title: `${newReceipts} receipt${newReceipts > 1 ? 's' : ''} from your email to check`, body: 'Hearth has matched them to your bills and payments — approve or change them.', url: '/#/receipts' });
       for (const cal of q.all('SELECT * FROM calendars WHERE household_id=? AND enabled=1', hid)) {
         if (hoursSince(cal.last_sync) >= 1) { try { await syncCalendar(cal); } catch (e) { log.warning('calendar', e.message); } }
       }
       for (const w of q.all('SELECT * FROM watches WHERE household_id=? AND enabled=1 AND url IS NOT NULL', hid)) {
         if (hoursSince(w.last_checked) >= getSetting(hid, 'price_check_hours', 6)) { try { await checkWatch(w); } catch { /* recorded on the watch */ } }
       }
+      require('./tracker').refreshNextDates(hid);
+      await trackerAlerts(hid).catch((e) => log.warning('tracker alerts', e.message));
       await budgetAlerts(hid);
       await dailyDigest(hid);
       await aiJobs(hid).catch((e) => log.warning('AI jobs', e.message));

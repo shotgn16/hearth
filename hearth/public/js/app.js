@@ -3,7 +3,10 @@ import { renderHome, renderInbox } from './home.js';
 import { renderMoney, txSheet } from './money.js';
 import { renderPlan } from './plan.js';
 import { renderInsights } from './insights.js';
-import { renderMore, renderCalendar, renderSubscriptions, renderWatch, renderNotes } from './more.js';
+import { renderMore, renderCalendar, renderWatch, renderNotes } from './more.js';
+import { renderSubscriptions } from './subs.js';
+import { renderExpenses } from './expenses.js';
+import { renderReceipts } from './receipts.js';
 import { renderAsk } from './ask.js';
 import { renderSettings } from './settings.js';
 
@@ -16,14 +19,14 @@ try { const th = localStorage.getItem('hl_theme'); if (th) document.documentElem
 const ROUTES = {
   '': ['Today', renderHome, 'home'], inbox: ['Needs attention', renderInbox, 'home'], money: ['Money', renderMoney, 'money'],
   plan: ['Plan', renderPlan, 'plan'], insights: ['Insights', renderInsights, 'insights'], more: ['More', renderMore, 'more'],
-  calendar: ['Events & costs', renderCalendar, 'more'], subscriptions: ['Regular payments', renderSubscriptions, 'more'],
+  calendar: ['Events & costs', renderCalendar, 'more'], subscriptions: ['Regular payments', renderSubscriptions, 'more'], expenses: ['Unexpected & work', renderExpenses, 'more'], receipts: ['Email receipts', renderReceipts, 'more'],
   watch: ['Price watch', renderWatch, 'more'], ask: ['Ask Hearth', renderAsk, 'more'], notes: ['Notes', renderNotes, 'more'],
   settings: ['Settings', renderSettings, 'more'],
 };
 
 function shell() {
   const nav = [['', 'Today', icons.home], ['money', 'Money', icons.money], ['plan', 'Plan', icons.plan], ['insights', 'Insights', icons.insights]];
-  const extra = [['inbox', 'Needs attention', icons.inbox], ['calendar', 'Events & costs', icons.calendar], ['subscriptions', 'Regular payments', icons.repeat],
+  const extra = [['inbox', 'Needs attention', icons.inbox], ['calendar', 'Events & costs', icons.calendar], ['subscriptions', 'Regular payments', icons.repeat], ['expenses', 'Unexpected & work', icons.alert], ['receipts', 'Email receipts', icons.mail],
     ['watch', 'Price watch', icons.watch], ['ask', 'Ask Hearth', icons.ai], ['notes', 'Notes', icons.note], ['settings', 'Settings', icons.settings]];
   app.innerHTML = `<div class="shell">
     <nav class="rail" aria-label="Main">

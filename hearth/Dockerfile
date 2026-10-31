@@ -1,8 +1,8 @@
-# Works both as a Home Assistant add-on (built on your HA box) and as a plain Docker image.
+# Plain Docker build (docker compose / local). The Home Assistant add-on uses the ready-made image built from .github/docker/Dockerfile.addon.
 ARG BUILD_FROM=node:22-alpine
 FROM ${BUILD_FROM}
 ARG BUILD_ARCH
-ARG BUILD_VERSION=1.1.0
+ARG BUILD_VERSION=1.2.0
 
 ENV NODE_ENV=production DATA_DIR=/data PORT=8484
 RUN apk add --no-cache tzdata wget

@@ -21,7 +21,8 @@ function createSession(userId) {
 
 function authMiddleware(req, res, next) {
   const hdr = req.headers.authorization || '';
-  const token = hdr.startsWith('Bearer ') ? hdr.slice(7) : (req.headers.cookie || '').match(/hl_token=([a-f0-9]+)/)?.[1];
+  const token = hdr.startsWith('Bearer ') ? hdr.slice(7) : (req.headers.cookie || '').match(/hl_token=([a-f0-9]+)/)?.[1]
+    || (req.method === 'GET' && /\/file\//.test(req.path) && /^[a-f0-9]{64}$/.test(req.query.t || '') ? req.query.t : null);
   if (!token) return res.status(401).json({ error: 'Not signed in' });
   const s = q.get(`SELECT s.*, u.household_id, u.name, u.email, u.role, u.color FROM sessions s JOIN users u ON u.id=s.user_id
                    WHERE s.token=? AND s.expires_at > ?`, token, new Date().toISOString());

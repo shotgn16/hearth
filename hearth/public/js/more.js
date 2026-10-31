@@ -5,7 +5,7 @@ import { md, actionCard, bindActionCards } from './ask.js';
 
 export async function renderMore(el) {
   const items = [['inbox', 'Needs attention', icons.inbox, 'Quick decisions Hearth needs from you'], ['calendar', 'Events & costs', icons.calendar, 'Your calendars, with budgets and real costs'],
-    ['subscriptions', 'Regular payments', icons.repeat, 'Subscriptions and bills, found automatically'], ['watch', 'Price watch', icons.watch, 'Things you want, and when to buy them'],
+    ['subscriptions', 'Regular payments', icons.repeat, 'Subscriptions and bills: what\'s due, what\'s come out'], ['expenses', 'Unexpected & work', icons.alert, 'Unplanned costs and expenses to claim back'], ['receipts', 'Email receipts', icons.mail, 'Receipts and bills from your email, matched for you to approve'], ['watch', 'Price watch', icons.watch, 'Things you want, and when to buy them'],
     ['ask', 'Ask Hearth', icons.ai, 'Budget and buying advice from your local AI'], ['notes', 'Notes', icons.note, 'Everything you have jotted'], ['insights', 'Insights', icons.insights, 'Trends, forecasts and reports'],
     ['settings', 'Settings', icons.settings, 'Banks, people, workflows, integrations, local AI']];
   el.innerHTML = `<div class="surface"><ul class="list">${items.map(([r, l, i, d]) => `<li class="tap" onclick="location.hash='#/${r}'"><span class="ico" style="background:var(--paper-2)">${i.replace('<svg', '<svg width="20"')}</span><div class="main"><div class="title">${l}</div><div class="meta">${d}</div></div><span class="muted">›</span></li>`).join('')}</ul></div>`;
@@ -67,37 +67,6 @@ async function eventSheet(id, done) {
   f.onsubmit = async (x) => { x.preventDefault(); const d = Object.fromEntries(new FormData(f)); await api(`/events/${id}`, { method: 'PATCH', body: { budget: d.budget === '' ? '' : Number(d.budget), person_id: d.person_id ? Number(d.person_id) : '', notes: d.notes } }); toast('Saved'); close(); done(); };
   on(el, 'click', '[data-link]', async (x, li) => { await api(`/events/${id}/link`, { method: 'POST', body: { transaction_ids: [Number(li.dataset.link)] } }); close(); eventSheet(id, done); });
   on(el, 'click', '[data-unlink]', async (x, b) => { await api(`/events/${id}/link`, { method: 'POST', body: { transaction_ids: [Number(b.dataset.unlink)], unlink: true } }); close(); eventSheet(id, done); });
-}
-
-// ---------- subscriptions & bills ----------
-export async function renderSubscriptions(el) {
-  const subs = await api('/subscriptions');
-  const perYear = { weekly: 52, fortnightly: 26, monthly: 12, quarterly: 4, yearly: 1 };
-  const active = subs.filter((s) => s.status === 'active');
-  const yearly = (list) => list.reduce((s, x) => s + x.amount * (perYear[x.cadence] || 12), 0);
-  const group = (title, list) => list.length ? `<section style="margin-bottom:22px"><h3>${title} · ${fmt0(yearly(list) / 12)}/month</h3><div class="surface"><ul class="list">${list.map((s) => `<li>${catIcon({ color: s.category_color, icon: s.category_icon })}
-    <div class="main"><div class="title">${esc(s.merchant)}${s.confirmed ? '' : ' <span class="tag" style="background:var(--amber-soft);color:var(--amber-ink)">new</span>'}</div><div class="meta">${s.cadence} · next ${relDay(s.next_date)} · ${fmt0(s.amount * (perYear[s.cadence] || 12))}/year</div></div>
-    <div class="amt">${fmt(s.amount)}</div><select data-s="${s.id}" style="width:auto;padding:6px"><option value="">⋯</option><option value="subscription">It's a subscription</option><option value="bill">It's a bill</option><option value="ignored">Not recurring</option><option value="cancelled">I've cancelled it</option></select></li>`).join('')}</ul></div></section>` : '';
-  el.innerHTML = `<div class="stat-row"><div><b>${fmt0(yearly(active) / 12)}</b><span>a month goes out on autopilot</span></div><div><b>${fmt0(yearly(active.filter((s) => s.type === 'subscription')))}</b><span>a year on subscriptions</span></div>
-    <div class="row" style="align-items:center"><button class="btn soft small" data-detect>Scan again</button>${state.me.ai?.enabled ? '<button class="btn soft small" data-aireview>Ask AI what to cut</button>' : ''}</div></div><div id="subai"></div>
-    ${group('Subscriptions', active.filter((s) => s.type === 'subscription'))}${group('Bills', active.filter((s) => s.type === 'bill'))}
-    ${group('Marked to cancel', subs.filter((s) => s.status === 'cancelling'))}${group('Stopped or cancelled', subs.filter((s) => ['lapsed', 'cancelled'].includes(s.status)))}
-    ${subs.length ? '' : '<div class="empty"><b>Nothing found yet</b>Hearth spots regular payments after it has seen two or three of them.</div>'}`;
-  el.querySelector('[data-aireview]')?.addEventListener('click', async (e) => {
-    e.target.disabled = true; e.target.textContent = 'Reviewing…';
-    try {
-      const r = await api('/ai/subscription-review', { method: 'POST' });
-      el.querySelector('#subai').innerHTML = `<div class="surface pad" style="margin-bottom:20px">${md(r.summary || '')}${r.suggestions.length ? `<ul class="small">${r.suggestions.map((x) => `<li><b>${esc(x.merchant)}</b> — ${esc(x.reason)}${x.yearly_saving ? ` (about ${fmt0(x.yearly_saving)}/yr)` : ''}</li>`).join('')}</ul>` : ''}${r.actions.map(actionCard).join('')}</div>`;
-      bindActionCards(el.querySelector('#subai'));
-    } catch (err) { fail(err); }
-    e.target.disabled = false; e.target.textContent = 'Ask AI what to cut';
-  });
-  el.querySelector('[data-detect]').onclick = async () => { const r = await api('/subscriptions/detect', { method: 'POST' }); toast(`Found ${r.length} regular payments`); renderSubscriptions(el); };
-  el.addEventListener('change', async (e) => {
-    const s = e.target.dataset.s; if (!s || !e.target.value) return; const v = e.target.value;
-    await api(`/subscriptions/${s}`, { method: 'PATCH', body: ['subscription', 'bill'].includes(v) ? { type: v, confirmed: 1 } : { status: v, confirmed: 1 } });
-    renderSubscriptions(el);
-  });
 }
 
 // ---------- price watch ----------

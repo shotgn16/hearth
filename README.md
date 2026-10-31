@@ -20,20 +20,22 @@ Everything stays on your Home Assistant machine — transactions, budgets, calen
 | **Today** — one sentence answers "am I OK?" ("£2,913 free until payday on Fri 27 Nov"), with an 8-week balance forecast, what's due, budgets and goals. | **Needs attention** — the only list you have to look at. Every answer teaches Hearth, so it shrinks over time. |
 | **Jot it down** — type `Ella's dentist £60 next Tue` or snap a receipt. Hearth works out the amount, date, category and person and files it. | **Ask Hearth** — chat with your own Ollama model. It looks up real figures and prepares budgets, goals and price watches you confirm with a tap. |
 | **Spreadsheet power** — editable transaction grid, bulk edits, saved views, a year planner where actuals fill themselves in, pivot reports, CSV export. | **Forecasts** — next 8 weeks, 2 years and 5 years, built from your regular payments, seasonality, plans and event budgets. |
-| **The whole household** — separate logins; budgets and targets that are shared, one person's own, or for the kids. | **Subscriptions & bills** — found automatically, separated from one-off purchases, price rises flagged. |
+| **The whole household** — separate logins; budgets and targets that are shared, one person's own, or for the kids. | **Regular payments tracker** — subscriptions and bills found automatically; set payment dates, see what's come out this month, ongoing / cancelling / ended with last payments, a 12-month history grid. |
 | **Calendars** — your HA calendars (Google, Outlook, Exchange…) with budgets and real costs on events. | **Home Assistant** — notifications to your phones, sensors for dashboards, events and service calls from workflows. |
-| **Price watch** — PriceRunner or any shop; tells you when it's a good time to buy. | **Bank sync** — superFin / SimpleFIN or any JSON feed, plus CSV/OFX/QIF import for years of history. |
+| **Unexpected costs & work expenses** — flag unplanned costs and see what to put aside; track work expenses from to claim → claimed → paid back. | **Price watch** — PriceRunner or any shop; tells you when it's a good time to buy. |
+| **Email receipts** — Hearth watches your mailbox, reads receipts and PDF bills, matches each to the right bill, payment and account, and waits for your approval. | **Bank sync** — superFin / SimpleFIN or any JSON feed, plus CSV/OFX/QIF import for years of history. |
+| **Workflows** — automatic rules for categories, tags, flags, notifications and Home Assistant. | |
 
 <p align="center">
 <img src="docs/images/today-phone.jpg" alt="Today on a phone" width="250">
 <img src="docs/images/ask-phone.jpg" alt="Ask Hearth on a phone" width="250">
-<img src="docs/images/money-phone.jpg" alt="Money on a phone" width="250">
+<img src="docs/images/subs-phone.jpg" alt="Regular payments on a phone" width="250">
 </p>
 
 ## Install
 
 1. Click **Add repository** above, or in Home Assistant go to **Settings → Add-ons → Add-on Store → ⋮ → Repositories** and add `https://github.com/shotgn16/hearth`.
-2. Find **Hearth** in the store and press **Install**. The first install builds on your device (a few minutes on a Raspberry Pi).
+2. Find **Hearth** in the store and press **Install**. Home Assistant downloads a ready-made image — nothing is built on your machine.
 3. On the **Configuration** tab, enter your **Ollama address** and **Chat model**.
 4. **Start** it, then open **Hearth** from the sidebar and create your household.
 
@@ -46,6 +48,9 @@ Works on `amd64` and `aarch64` (Raspberry Pi 4/5, most mini PCs, HA Green/Yellow
 - [Getting started](docs/getting-started.md)
 - [Connecting your bank and importing history](docs/bank-and-import.md)
 - [Everyday use: Today, Needs attention, Jot, Money, Plan, Insights](docs/everyday-use.md)
+- [Regular payments: the subscription and bill tracker](docs/regular-payments.md)
+- [Email receipts](docs/email-receipts.md)
+- [Unexpected costs and work expenses](docs/unexpected-and-work.md)
 - [Households: people, shared and individual budgets](docs/household.md)
 - [Local AI (Ollama)](docs/local-ai.md)
 - [Home Assistant integration](docs/home-assistant.md)
@@ -59,7 +64,7 @@ Works on `amd64` and `aarch64` (Raspberry Pi 4/5, most mini PCs, HA Green/Yellow
 
 ## Privacy in one paragraph
 
-Hearth has no cloud, no account with us and no telemetry. It only connects to the things you set up: your bank feed, your calendars, your Ollama server, Home Assistant, and shop pages for price watching (which receive only the product link). Read more in [Privacy, security and backups](docs/privacy-and-security.md).
+Hearth has no cloud, no account with us and no telemetry. It only connects to the things you set up: your bank feed, your calendars, your mailboxes (for receipts), your Ollama server, Home Assistant, and shop pages for price watching (which receive only the product link). Read more in [Privacy, security and backups](docs/privacy-and-security.md).
 
 ## Licence
 

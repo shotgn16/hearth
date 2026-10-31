@@ -33,13 +33,17 @@ function detectSubscriptions(hid) {
     const daysSince = (Date.now() - new Date(last.date)) / 86400000;
     const status = daysSince > cad[1] * 2 + cad[2] ? 'lapsed' : 'active';
     const existing = q.get('SELECT * FROM subscriptions WHERE household_id=? AND merchant=?', hid, merchant);
+    if (existing?.manual) { q.run('UPDATE subscriptions SET last_date=MAX(COALESCE(last_date,\'\'),?), occurrences=? WHERE id=?', last.date, txs.length, existing.id);
+      q.run(`UPDATE transactions SET kind=?, subscription_id=? WHERE household_id=? AND merchant=? AND amount<0`, existing.type || 'subscription', existing.id, hid, merchant); continue; }
     const priceChange = existing && existing.amount && Math.abs(existing.amount - lastAmt) > 0.009 ? { from: existing.amount, to: lastAmt } : null;
     const type = /bills|rent|mortgage|insurance|phone|internet/i.test(last.cat || '') ? 'bill' : 'subscription';
-    q.run(`INSERT INTO subscriptions(household_id,merchant,amount,cadence,interval_days,next_date,last_date,category_id,status,occurrences,type)
-           VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(household_id,merchant) DO UPDATE SET amount=excluded.amount, cadence=excluded.cadence,
+    q.run(`INSERT INTO subscriptions(household_id,merchant,amount,cadence,interval_days,next_date,last_date,category_id,status,occurrences,type,start_date)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(household_id,merchant) DO UPDATE SET amount=excluded.amount, cadence=excluded.cadence,
            interval_days=excluded.interval_days, next_date=excluded.next_date, last_date=excluded.last_date,
-           status=CASE WHEN subscriptions.status='ignored' THEN 'ignored' ELSE excluded.status END, occurrences=excluded.occurrences, type=excluded.type`,
-      hid, merchant, lastAmt, cad[0], cad[1], next, last.date, last.category_id, status, txs.length, type);
+           status=CASE WHEN subscriptions.status IN ('ignored','paused','cancelling','ended') THEN subscriptions.status ELSE excluded.status END,
+           occurrences=excluded.occurrences, type=CASE WHEN subscriptions.confirmed=1 THEN subscriptions.type ELSE excluded.type END,
+           start_date=COALESCE(subscriptions.start_date, excluded.start_date)`,
+      hid, merchant, lastAmt, cad[0], cad[1], next, last.date, last.category_id, status, txs.length, type, txs[0].date);
     const sub = q.get('SELECT * FROM subscriptions WHERE household_id=? AND merchant=?', hid, merchant);
     if (sub.status !== 'ignored') {
       q.run(`UPDATE transactions SET kind=?, subscription_id=? WHERE household_id=? AND merchant=? AND amount<0`, sub.type, sub.id, hid, merchant);

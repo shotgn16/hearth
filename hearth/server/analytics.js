@@ -36,6 +36,9 @@ function budgetStatus(hid, b, ref = new Date()) {
   else sql += ` AND COALESCE((SELECT kind FROM categories WHERE id=t.category_id),'expense')!='transfer'`;
   if (tags.length) { sql += ` AND t.id IN (SELECT transaction_id FROM transaction_tags WHERE tag_id IN (${tags.map(() => '?').join(',')}))`; params.push(...tags); }
   if (b.event_id) { sql += ' AND t.event_id=?'; params.push(b.event_id); }
+  if (b.flag === 'unexpected') sql += ' AND t.unexpected=1';
+  if (b.flag === 'work') sql += ' AND t.work_expense=1';
+  if (b.flag === 'not_unexpected') sql += ' AND t.unexpected=0';
   const sf = scopeFilter(b.scope, b.user_id, b.person_id); sql += sf.sql; params.push(...sf.params);
   const { spent, n } = q.get(sql, ...params);
   const totalDays = (new Date(end) - new Date(start)) / 86400000 + 1;
@@ -241,6 +244,16 @@ function inbox(hid) {
   for (const b of budgets) items.push({ type: 'budget', id: `budget-${b.id}`, budget: b, title: `${b.name}: ${b.pct}% used`, body: `${b.remaining >= 0 ? `£${b.remaining.toFixed(0)} left` : `£${(-b.remaining).toFixed(0)} over`}, ${b.days_left ? `${b.days_left} days to go` : 'last day of the period'}` });
   const soon = q.all(`SELECT * FROM events WHERE household_id=? AND start BETWEEN ? AND ? AND budget IS NULL AND estimated_cost IS NULL`, hid, iso(new Date()), iso(addDays(new Date(), 14)));
   for (const e of soon.slice(0, 5)) items.push({ type: 'event', id: `event-${e.id}`, event: e, title: `Will "${e.title}" cost anything?`, body: `${e.start.slice(0, 10)} — set a budget or dismiss`, soft: true });
+  // subscription tracker: overdue payments and charges after something was ended
+  const tracker = require('./tracker');
+  for (const a of tracker.alerts(hid)) {
+    if (a.kind === 'overdue') items.push({ type: 'sub_overdue', id: `due-${a.subscription.id}-${a.due_date}`, alert: a, title: `${a.subscription.display} hasn't come out`, body: `£${a.expected.toFixed(2)} was due ${a.due_date} (${a.days_late} days ago)` });
+    else items.push({ type: 'sub_after_end', id: `after-${a.subscription.id}-${a.paid_date}`, alert: a, title: `${a.subscription.display} charged you after it ended`, body: `£${a.paid_amount.toFixed(2)} on ${a.paid_date} — ended ${a.subscription.end_date}` });
+  }
+  const unclaimed = q.get(`SELECT COUNT(*) n, ROUND(COALESCE(SUM(-amount),0),2) v, MIN(date) d FROM transactions WHERE household_id=? AND work_expense=1 AND COALESCE(claim_status,'to_claim')='to_claim'`, hid);
+  if (unclaimed.n && unclaimed.d <= iso(addDays(new Date(), -14))) items.push({ type: 'work_claim', id: `claim-${unclaimed.n}-${unclaimed.v}`, title: `£${unclaimed.v.toFixed(2)} of work expenses to claim`, body: `${unclaimed.n} item${unclaimed.n > 1 ? 's' : ''}, oldest from ${unclaimed.d}` });
+  const pendingReceipts = q.get(`SELECT COUNT(*) n FROM email_receipts WHERE household_id=? AND status='pending'`, hid).n;
+  if (pendingReceipts) items.push({ type: 'receipts', id: `receipts-${pendingReceipts}`, title: `${pendingReceipts} email receipt${pendingReceipts > 1 ? 's' : ''} to approve`, body: 'Matched to your bills and payments — check and approve' });
   const aiFiled = q.get(`SELECT COUNT(*) n FROM transactions WHERE household_id=? AND categorised_by='ai'`, hid).n;
   if (aiFiled) items.push({ type: 'ai_check', id: `ai-${aiFiled}`, title: `The AI filed ${aiFiled} transaction${aiFiled > 1 ? 's' : ''}`, body: 'Glance over them, then accept so Hearth remembers', count: aiFiled });
   for (const a of q.all(`SELECT * FROM ai_actions WHERE household_id=? AND status='pending' AND created_at>=datetime('now','-14 days') ORDER BY id DESC LIMIT 5`, hid))
