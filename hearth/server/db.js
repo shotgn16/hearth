@@ -187,3 +187,18 @@ function setSetting(hid, key, value) {
 }
 
 module.exports = { db, q, getSetting, setSetting, DATA_DIR };
+
+// App-wide settings (household 0): seeded once from the old add-on options, then edited inside Hearth
+{
+  let sys = getSetting(0, 'system');
+  if (!sys) {
+    sys = config.systemDefaults();
+    setSetting(0, 'system', sys);
+    const o = config.legacyOptions || {};
+    if (o.ollama_url || o.ollama_model) for (const h of q.all('SELECT id FROM households')) {
+      const cur = getSetting(h.id, 'ollama', {}) || {};
+      setSetting(h.id, 'ollama', { url: o.ollama_url, model: o.ollama_model, fast_model: o.ollama_fast_model || '', vision_model: o.ollama_vision_model || '', ...Object.fromEntries(Object.entries(cur).filter(([, v]) => v !== '' && v != null)) });
+    }
+  }
+  config.applySystem(sys);
+}

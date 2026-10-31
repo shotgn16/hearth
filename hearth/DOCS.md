@@ -8,9 +8,9 @@ Everything — transactions, budgets, calendar copies, AI conversations — live
 
 ## First run
 
-1. **Configuration tab** — set **Ollama address** (e.g. `http://192.168.1.50:11434`) and **Chat model**. Optional: a smaller **Fast model** for background jobs and a **Vision model** for receipt scanning. Save.
-2. **Start** the add-on, then open **Hearth** from the sidebar.
-3. Create your household. Your account is linked to your Home Assistant login, so from now on opening the panel signs you straight in.
+1. **Start** the add-on, then open **Hearth** from the sidebar. There's nothing to set on the Configuration tab apart from an optional network port.
+2. Create your household. Your account is linked to your Home Assistant login, so from now on opening the panel signs you straight in.
+3. **Settings → Local AI** — set the **Ollama address** (e.g. `http://192.168.1.50:11434`) and models. **Settings → App settings** — time zone, Home Assistant sensors and sign-in.
 4. Follow the cards: **Settings → Bank connections**, **Import statements**, **People & household**, **Calendars**.
 
 ### Adding your partner or family

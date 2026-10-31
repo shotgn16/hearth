@@ -1,5 +1,5 @@
 name: Hearth
-version: "1.3.1"
+version: "1.4.0"
 slug: hearth
 description: Household money manager with bank sync, budgets, forecasts and local AI (Ollama)
 url: "https://github.com/shotgn16/hearth"
@@ -34,21 +34,6 @@ ports_description:
 backup: hot
 backup_pre: "wget -qO- http://127.0.0.1:8484/internal/checkpoint"
 
-options:
-  ollama_url: "http://homeassistant.local:11434"
-  ollama_model: "qwen2.5:7b-instruct"
-  ollama_fast_model: ""
-  ollama_vision_model: ""
-  timezone: "Europe/London"
-  auto_create_ha_users: false
-  publish_sensors: true
-  log_level: info
-schema:
-  ollama_url: url
-  ollama_model: str
-  ollama_fast_model: "str?"
-  ollama_vision_model: "str?"
-  timezone: str
-  auto_create_ha_users: bool
-  publish_sensors: bool
-  log_level: list(debug|info|warning|error)
+# Everything else is set inside Hearth: Settings → App settings and Settings → Local AI.
+options: {}
+schema: {}

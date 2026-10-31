@@ -115,13 +115,20 @@ async function tick() {
   if (running) return; running = true;
   try {
     for (const h of q.all('SELECT id FROM households')) {
-      const hid = h.id;
+      try { await householdTick(h.id); } catch (e) { log.error('Background jobs failed', e.stack || e.message); }
+    }
+  } finally { running = false; }
+}
+
+async function householdTick(hid) {
+  {
+    {
       const syncHours = getSetting(hid, 'bank_sync_hours', 4);
       let changed = false;
       for (const c of q.all('SELECT * FROM connections WHERE household_id=? AND auto_sync=1', hid)) {
         if (hoursSince(c.last_sync) >= syncHours) { try { const r = await syncConnection(c); if (r.added) changed = true; } catch (e) { log.warning('bank sync', e.message); } }
       }
-      if (changed) await afterNewTransactions(hid);
+      if (changed) await afterNewTransactions(hid).catch((e) => log.warning('after import', e.message));
       // email receipts: check each mailbox, then re-check pending suggestions (the bank payment may have arrived since)
       let newReceipts = 0;
       for (const acct of q.all(`SELECT * FROM email_accounts WHERE household_id=? AND enabled=1 AND (kind IS NOT 'microsoft' OR graph_refresh_token IS NOT NULL)`, hid)) {
@@ -137,14 +144,15 @@ async function tick() {
       }
       require('./tracker').refreshNextDates(hid);
       await trackerAlerts(hid).catch((e) => log.warning('tracker alerts', e.message));
-      await budgetAlerts(hid);
-      await dailyDigest(hid);
+      await budgetAlerts(hid).catch((e) => log.warning('budget alerts', e.message));
+      await dailyDigest(hid).catch((e) => log.warning('daily digest', e.message));
       await aiJobs(hid).catch((e) => log.warning('AI jobs', e.message));
       await sensors(hid).catch((e) => log.debug('sensors', e.message));
     }
-  } finally { running = false; }
+  }
 }
 
-function start() { setTimeout(tick, 10000); setInterval(tick, 15 * 60 * 1000); }
+const safeTick = () => tick().catch((e) => log.error('Background jobs failed', e.stack || e.message));
+function start() { setTimeout(safeTick, 10000); setInterval(safeTick, 15 * 60 * 1000); }
 
 module.exports = { start, tick, afterNewTransactions, budgetAlerts, sensors };

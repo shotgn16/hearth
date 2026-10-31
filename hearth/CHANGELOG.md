@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.0
+- All settings now live inside Hearth: **Settings → App settings** (time zone, Home Assistant sensors and sign-in, log detail) and **Settings → Local AI** (Ollama address and models). The add-on's Configuration tab only has the optional network port. Your existing choices are carried over automatically
+- Stability: a failure in a background job (bank sync, alerts, sensors) is logged instead of stopping the app, so Hearth no longer crash-loops after importing unusual bank data
+- The bank connections screen no longer shows calendar switches by mistake, and explains connecting Synci step by step
+- Bank feeds: pending payments without a date, odd amounts and very old dates are handled; the first import no longer runs workflows or large-payment alerts for every historical payment
+
 ## 1.3.1
 - Bank feeds (SimpleFIN, including Synci for UK banks): history is fetched in 90-day steps as SimpleFIN requires, reaching back up to about 2 years on the first import and stopping when history runs out
 - Clearer messages for a used or expired setup token, and the connection is kept if the first import fails so "Sync now" can retry without a new token

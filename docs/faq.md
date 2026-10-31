@@ -55,7 +55,7 @@ Your model doesn't support tool calling. Hearth answers from a data summary inst
 Set *Creativity* to *Precise*, use a tool-capable model, and make sure *Let the assistant look things up* is on.
 
 **Receipt scanning button is missing.**
-Set a **vision model** in **Settings → Local AI** (or the add-on options).
+Set a **vision model** in **Settings → Local AI** .
 
 ## Email receipts
 
@@ -83,7 +83,7 @@ Pick your phone's `mobile_app_…` service in **Settings → Integrations**, or 
 The link opens the add-on's panel; make sure **Show in sidebar** is on for the add-on.
 
 **`sensor.hearth_*` entities are missing.**
-Check **Publish sensors** is on in the add-on options. They appear within 15 minutes of the add-on starting and reappear shortly after an HA restart.
+Check **Publish sensors** is on in **Settings → App settings**. They appear within 15 minutes of the add-on starting and reappear shortly after an HA restart.
 
 **An HA calendar shows no events.**
 Check the entity shows events in HA's own Calendar view, then press **Sync** in **Settings → Calendars**.

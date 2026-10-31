@@ -11,6 +11,7 @@ const SECTIONS = [
   ['ai', 'Local AI', 'Ollama models, what the AI does for you, activity'],
   ['integrations', 'Integrations', 'Home Assistant, ntfy, price comparison'],
   ['data', 'Your data', 'Backup, export and sync timing'],
+  ['app', 'App settings', 'Time zone, Home Assistant sign-in and sensors, logs'],
 ];
 
 export async function renderSettings(el, parts) {
@@ -20,7 +21,7 @@ export async function renderSettings(el, parts) {
     return;
   }
   document.querySelector('.topbar h1').textContent = SECTIONS.find((x) => x[0] === s)?.[1] || 'Settings';
-  return ({ email: emailSettings, people, banks, import: importer, categories, workflows, calendars, integrations, data, ai: aiSettings })[s]?.(el);
+  return ({ email: emailSettings, people, banks, import: importer, categories, workflows, calendars, integrations, data, ai: aiSettings, app: appSettings })[s]?.(el);
 }
 
 // ---------- people ----------
@@ -59,26 +60,13 @@ async function people(el) {
 // ---------- banks ----------
 async function banks(el) {
   const list = await api('/connections');
-  let haCals = [];
-  if (state.me.ha) haCals = await api('/homeassistant/calendars').catch(() => []);
-  const linked = new Set(list.filter((c) => c.provider === 'homeassistant').map((c) => c.url));
-  const msAccts = (await api('/email/accounts').catch(() => [])).filter((a) => a.kind === 'microsoft');
-  const msLinked = new Set(list.filter((c) => c.provider === 'microsoft').map((c) => c.url));
-  const msBlock = `<div class="surface pad" style="margin-bottom:20px"><h3 style="margin-top:0">From Microsoft 365 / Outlook.com</h3>
-    ${msAccts.length ? `<p class="muted small">Uses the Microsoft sign-in from Email receipts. Tick to keep a local copy of that account's calendar.</p><ul class="list">${msAccts.map((a) => `<li><div class="main"><div class="title">${esc(a.address || a.name)}</div><div class="meta">${a.signed_in ? 'Signed in' : 'Not signed in yet — finish signing in under Email receipts'}</div></div>
-      <label class="switch"><input type="checkbox" data-mscal="${a.id}" data-name="${esc(a.address || a.name)}" ${msLinked.has(String(a.id)) ? 'checked' : ''} ${a.signed_in ? '' : 'disabled'}><i></i></label></li>`).join('')}</ul>`
-      : '<p class="muted small">Sign in with Microsoft under <a href="#/settings/email">Email receipts</a> (choose "Outlook.com / Microsoft 365") and your Outlook calendar can be copied here too — no published link needed.</p>'}</div>`;
-  const haBlock = state.me.ha ? `<div class="surface pad" style="margin-bottom:20px"><h3 style="margin-top:0">From Home Assistant</h3>
-    <p class="muted small">Calendars you've already connected to Home Assistant (Google, Outlook, Microsoft 365/Exchange, CalDAV, local…). Tick to keep a local copy in Hearth.</p>
-    ${haCals.length ? `<ul class="list">${haCals.map((c) => `<li><div class="main"><div class="title">${esc(c.name)}</div><div class="meta">${esc(c.entity_id)}</div></div>
-      <label class="switch"><input type="checkbox" data-hacal="${esc(c.entity_id)}" data-name="${esc(c.name)}" ${linked.has(c.entity_id) ? 'checked' : ''}><i></i></label></li>`).join('')}</ul>` : '<p class="muted small">No calendar entities found in Home Assistant.</p>'}</div>` : '';
-  el.innerHTML = `${msBlock}${haBlock}${list.length ? `<div class="surface" style="margin-bottom:20px"><ul class="list">${list.map((c) => `<li style="flex-wrap:wrap"><div class="main" style="min-width:200px"><div class="title">${esc(c.name)}</div><div class="meta">${c.provider} · ${c.last_sync ? `synced ${relDay(c.last_sync)}` : 'never synced'}${c.last_error ? ` · ⚠ ${esc(c.last_error)}` : ''}</div></div>
+  el.innerHTML = `${list.length ? `<div class="surface" style="margin-bottom:20px"><ul class="list">${list.map((c) => `<li style="flex-wrap:wrap"><div class="main" style="min-width:200px"><div class="title">${esc(c.name)}</div><div class="meta">${c.provider} · ${c.last_sync ? `synced ${relDay(c.last_sync)}` : 'never synced'}${c.last_error ? ` · ⚠ ${esc(c.last_error)}` : ''}</div></div>
       <div class="row" style="gap:6px"><label class="row small"><span class="muted">Auto</span><label class="switch"><input type="checkbox" data-auto="${c.id}" ${c.auto_sync ? 'checked' : ''}><i></i></label></label>
       <button class="btn small soft" data-sync="${c.id}">Sync now</button><button class="btn small ghost" data-full="${c.id}">Re-pull history</button><button class="btn small ghost" data-del="${c.id}">Remove</button></div></li>`).join('')}</ul></div>` : ''}
-    <div class="surface pad"><h3 style="margin-top:0">Connect superFin</h3>
-      <p class="muted small">Paste the setup token or access URL your superFin / SimpleFIN Bridge account gives you. Hearth claims it once, stores the access details only in your local database, pulls every transaction the bank allows, then syncs on a schedule.</p>
+    <div class="surface pad"><h3 style="margin-top:0">Connect your bank</h3>
+      <p class="muted small">Works with any SimpleFIN bank feed — <b>Synci</b> (UK banks), superFin or SimpleFIN Bridge. In Synci: <b>Destinations → SimpleFIN</b> (or Actual Budget) → create a connection → copy the <b>setup token</b>, paste it here and press <b>Connect and import</b>. Hearth stores the access only on this server, imports your history and then keeps itself up to date.</p>
       <form id="sf"><label class="f"><span>Setup token or access URL</span><input type="text" name="token" required placeholder="aHR0cHM6Ly9…  or  https://user:pass@…/simplefin"></label>
-        <div class="kv"><label class="f"><span>Name</span><input type="text" name="name" value="superFin"></label><label class="f"><span>Accounts belong to</span><select name="owner_user_id"><option value="">Shared / joint</option>${opts(state.users, null)}</select></label>
+        <div class="kv"><label class="f"><span>Name</span><input type="text" name="name" value="Synci"></label><label class="f"><span>Accounts belong to</span><select name="owner_user_id"><option value="">Shared / joint</option>${opts(state.users, null)}</select></label>
         <label class="f"><span>Pull history from</span><input type="date" name="history_from" value="2000-01-01"></label></div>
         <button class="btn">Connect and import</button></form>
       <details class="adv" style="margin-top:14px"><summary>superFin uses a different API? Map any JSON bank feed</summary>
@@ -508,7 +496,7 @@ async function aiSettings(el) {
     <form id="af">
     <div class="settings-group surface pad"><h3>Connection</h3><div class="kv">
       <label class="row" style="grid-column:1/-1"><label class="switch"><input type="checkbox" name="enabled" ${o.enabled !== false ? 'checked' : ''}><i></i></label> Use local AI</label>
-      <label class="f" style="grid-column:1/-1"><span>Ollama address</span><input type="text" name="url" value="${esc(o.url || '')}" placeholder="Uses the add-on option if empty"></label>
+      <label class="f" style="grid-column:1/-1"><span>Ollama address</span><input type="text" name="url" value="${esc(o.url || '')}" placeholder="http://homeassistant.local:11434"></label>
     </div></div>
     <div class="settings-group surface pad"><h3>Models</h3><p class="muted small">Pick a model for each job. Leave a box empty to use the default from the add-on options.</p><div class="kv">
       <label class="f"><span>Chat & advice</span><select name="model" data-models data-cur="${esc(o.model || '')}"></select></label>
@@ -566,4 +554,27 @@ async function data(el) {
   const dl = async (path, name) => { const r = await fetch(`api${path}`, { headers: { Authorization: `Bearer ${token()}` } }); const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = name; a.click(); };
   el.querySelector('[data-backup]').onclick = () => dl('/backup', `hearth-backup-${iso()}.json`);
   el.querySelector('[data-csv]').onclick = () => dl('/transactions/export.csv', `hearth-transactions-${iso()}.csv`);
+}
+
+// ---------- app-wide settings (previously the add-on's Configuration tab) ----------
+async function appSettings(el) {
+  const s = await api('/system'); const admin = state.me.user.role === 'admin';
+  const zones = s.timezones.includes(s.timezone) ? s.timezones : [s.timezone, ...s.timezones];
+  el.innerHTML = `<div class="settings-group surface pad"><form id="sysf" class="kv">
+      <label class="f"><span>Time zone</span><select name="timezone">${zones.map((z) => `<option ${z === s.timezone ? 'selected' : ''}>${esc(z)}</option>`).join('')}</select></label>
+      <label class="f"><span>Log detail</span><select name="log_level">${[['error', 'Errors only'], ['warning', 'Warnings'], ['info', 'Normal'], ['debug', 'Everything (for troubleshooting)']].map(([v, l]) => `<option value="${v}" ${v === s.log_level ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <p class="small muted" style="grid-column:1/-1;margin:0">The time zone sets paydays, month boundaries and when the morning summary arrives.</p>
+      ${s.addon ? `<h3 style="grid-column:1/-1;margin:12px 0 0">Home Assistant</h3>
+      <label class="row" style="grid-column:1/-1"><label class="switch"><input type="checkbox" name="publish_sensors" ${s.publish_sensors ? 'checked' : ''}><i></i></label> Publish sensors (free to spend, spending this month, things to check, next payment) for dashboards and automations</label>
+      <label class="row" style="grid-column:1/-1"><label class="switch"><input type="checkbox" name="auto_create_ha_users" ${s.auto_create_ha_users ? 'checked' : ''}><i></i></label> Let any Home Assistant user in — they get their own Hearth login the first time they open the panel</label>` : ''}
+      ${admin ? '<div class="row end" style="grid-column:1/-1"><button class="btn">Save</button></div>' : '<p class="small muted" style="grid-column:1/-1">Only an admin can change these.</p>'}
+    </form></div>
+    <p class="small muted">The local AI (Ollama address and models) is under <a href="#/settings/ai">Local AI</a>. The only setting left in Home Assistant is the optional network port on the add-on's Configuration tab.</p>`;
+  if (!admin) el.querySelectorAll('#sysf select, #sysf input').forEach((x) => { x.disabled = true; });
+  el.querySelector('#sysf').onsubmit = async (e) => {
+    e.preventDefault(); const f = e.target;
+    const body = { timezone: f.timezone.value, log_level: f.log_level.value };
+    if (s.addon) Object.assign(body, { publish_sensors: f.publish_sensors.checked, auto_create_ha_users: f.auto_create_ha_users.checked });
+    try { await api('/system', { method: 'PUT', body }); toast('Saved'); } catch (err) { fail(err); }
+  };
 }

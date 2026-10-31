@@ -17,6 +17,7 @@ async function ingest(hid, list, { source = 'manual', userId = null, runWorkflow
   for (const raw of list) {
     if (!raw.date || raw.amount == null || isNaN(Number(raw.amount))) { result.skipped++; continue; }
     const t = { ...raw, amount: Number(raw.amount), date: String(raw.date).slice(0, 10) };
+    if (!/^(19[9]\d|20\d\d)-\d\d-\d\d$/.test(t.date) || !Number.isFinite(t.amount)) { result.skipped++; continue; }
     // Two identical coffees on the same day are both real; give them a sequence number for hashing
     const k = `${t.account_id}|${t.date}|${t.amount}|${t.description}`;
     t._seq = seen[k] = (seen[k] ?? -1) + 1;

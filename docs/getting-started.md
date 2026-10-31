@@ -9,27 +9,20 @@ This takes about 15 minutes, most of it waiting for your bank history to import.
 1. In Home Assistant open **Settings → Add-ons → Add-on Store**, then **⋮ → Repositories**, add `https://github.com/shotgn16/hearth` and close the dialog. (Or use the **Add repository** button on the [project page](../README.md).)
 2. Scroll to **Hearth**, open it and press **Install**. Home Assistant downloads a ready-made image for your machine (amd64 or aarch64) — there's nothing to compile.
 
-## 2. Configure
+## 2. Start it
 
-On the add-on's **Configuration** tab:
-
-| Option | What to put |
-|---|---|
-| **Ollama address** | The machine running Ollama, e.g. `http://192.168.1.50:11434`. Not `localhost` — that would mean the add-on itself. |
-| **Chat model** | e.g. `qwen2.5:7b-instruct`. Any instruct model with tool support works best. |
-| **Fast model** *(optional)* | A smaller model for background jobs, e.g. `qwen2.5:3b-instruct`. Empty = use the chat model. |
-| **Vision model** *(optional)* | Enables receipt scanning, e.g. `qwen2.5vl:7b`. Empty = receipt scanning hidden. |
-| **Time zone** | Used for paydays, month boundaries and the morning summary. |
-| **Let any Home Assistant user in** | Off by default. On = every HA user who opens the panel gets their own Hearth login automatically. |
-| **Publish sensors** | On = creates `sensor.hearth_*` entities for dashboards and automations. |
-
-Save, then press **Start**. Turn on **Show in sidebar** if it isn't already.
-
-Everything here can be changed later inside Hearth too (**Settings → Local AI**). Values saved inside Hearth win over the add-on options.
+Press **Start** and turn on **Show in sidebar**. There's nothing to fill in on the add-on's Configuration tab: every setting lives inside Hearth. The only thing there is an optional network port (see [Home Assistant](home-assistant.md)).
 
 ## 3. Create your household
 
 Open **Hearth** from the sidebar. The first screen creates your household and your account; your name is filled in from Home Assistant. Your Hearth account is linked to your HA login, so from now on the panel signs you straight in.
+
+Then, inside Hearth:
+
+| Where | What to set |
+|---|---|
+| **Settings → Local AI** | **Ollama address** — the machine running Ollama, e.g. `http://192.168.1.50:11434` (not `localhost`, which would mean the add-on itself) — and the chat, fast and vision models. |
+| **Settings → App settings** | **Time zone** (paydays, month boundaries, morning summary), **Publish sensors** (`sensor.hearth_*` for dashboards), **Let any Home Assistant user in**, and how much goes in the log. |
 
 You land on a welcome screen with the next steps.
 

@@ -21,7 +21,7 @@ hearth/
   DOCS.md                  shown on the add-on's Documentation tab
   server/
     index.js               HTTP API, ingress sign-in, static files with <base href> injection
-    config.js              add-on options (/data/options.json) / env vars
+    config.js              env-var defaults; app-wide settings live in the database (Settings → App settings)
     db.js                  schema + migrations
     auth.js                passwords and sessions
     ingest.js              single entry point for transactions; CSV/OFX/QIF parsers

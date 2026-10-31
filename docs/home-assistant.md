@@ -8,7 +8,7 @@ Because Hearth runs as an add-on, it talks to Home Assistant directly through th
 
 ## Sidebar panel and sign-in
 
-Hearth appears in the HA sidebar and in the HA app on every phone. The panel identifies you from your Home Assistant login: the first time, you sign in to Hearth once to link the two; after that it opens straight in. (Turn on **Let any Home Assistant user in** in the add-on options to give every HA user their own Hearth login automatically.)
+Hearth appears in the HA sidebar and in the HA app on every phone. The panel identifies you from your Home Assistant login: the first time, you sign in to Hearth once to link the two; after that it opens straight in. (Turn on **Let any Home Assistant user in** in **Settings → App settings** to give every HA user their own Hearth login automatically.)
 
 Hearth only trusts HA's identity information when the request really comes through Home Assistant's ingress proxy.
 
@@ -29,7 +29,7 @@ Everything also appears under the bell in Hearth.
 
 ## Sensors
 
-With **Publish sensors** on (add-on options), Hearth updates these entities every 15 minutes:
+With **Publish sensors** on (**Settings → App settings**), Hearth updates these entities every 15 minutes:
 
 | Entity | State | Attributes |
 |---|---|---|

@@ -52,13 +52,18 @@ async function simplefinFetch(accessUrl, startDate) {
       let acc = accounts.get(a.id);
       if (!acc) {
         acc = { external_id: a.id, name: a.name, institution: a.org?.name || a.org?.domain || orgs[a.conn_id] || null, currency: /^[A-Z]{3}$/.test(a.currency || '') ? a.currency : 'GBP',
-          balance: Number(a.balance), balance_date: a['balance-date'] ? new Date(a['balance-date'] * 1000).toISOString() : null, tx: new Map() };
+          balance: Number(a.balance) || 0, balance_date: a['balance-date'] ? new Date(a['balance-date'] * 1000).toISOString() : null, tx: new Map() };
         accounts.set(a.id, acc);
       }
       for (const t of a.transactions || []) {
-        if (acc.tx.has(t.id)) continue; got++;
-        acc.tx.set(t.id, { external_id: t.id, date: new Date((Number(t.transacted_at) || Number(t.posted)) * 1000).toISOString().slice(0, 10),
-          amount: Number(t.amount), description: [t.payee, t.description].filter(Boolean).join(' — ') || t.memo || '', pending: !!t.pending || Number(t.posted) === 0 });
+        const key = t.id != null ? String(t.id) : `${t.posted}|${t.amount}|${t.description}`;
+        if (acc.tx.has(key)) continue; got++;
+        // pending payments may have no posted date yet (0): use when it happened, or today
+        const when = Number(t.transacted_at) || Number(t.posted) || (t.pending ? Math.floor(Date.now() / 1000) : 0);
+        const amount = Number(String(t.amount ?? '').replace(/[^0-9.\-]/g, ''));
+        if (!when || when < 631152000 || !Number.isFinite(amount)) continue; // no usable date (before 1990) or amount
+        acc.tx.set(key, { external_id: t.id != null ? String(t.id) : null, date: new Date(when * 1000).toISOString().slice(0, 10),
+          amount, description: [t.payee, t.description].filter(Boolean).join(' — ') || t.memo || '', pending: !!t.pending || !Number(t.posted) });
       }
     }
     // stop reaching back once a whole window comes back empty (history has run out)
@@ -112,7 +117,8 @@ async function syncConnection(conn, { full = false } = {}) {
       } else q.run('UPDATE accounts SET balance=?, balance_date=? WHERE id=?', a.balance, a.balance_date || new Date().toISOString(), acc.id);
       // drop stale pending rows that have since posted under a new id
       q.run(`DELETE FROM transactions WHERE account_id=? AND pending=1 AND source='bank'`, acc.id);
-      const res = await ingest(hid, a.transactions.map((t) => ({ ...t, account_id: acc.id, user_id: cfg.owner_user_id })), { source: 'bank' });
+      // workflows and alerts only for new activity, not for history pulled in on the first import
+      const res = await ingest(hid, a.transactions.map((t) => ({ ...t, account_id: acc.id, user_id: cfg.owner_user_id })), { source: 'bank', runWorkflows: !full && !!conn.last_sync });
       added += res.added;
     }
     q.run('UPDATE connections SET last_sync=?, last_error=? WHERE id=?', new Date().toISOString(), data.errors.join('; ') || null, conn.id);

@@ -9,7 +9,7 @@ One Hearth install holds one household. Inside it there are **users** and **peop
 **Settings → People & household → Add user** (admins only).
 
 - Each user has their own email and password, and sees the whole household.
-- **Linking to Home Assistant:** the first time a user opens Hearth from the HA sidebar, they sign in once with their Hearth password. Their HA login is then linked and future visits sign in automatically. To skip that step, switch on **Let any Home Assistant user in** in the add-on options — any HA user who opens the panel then gets a Hearth login of their own.
+- **Linking to Home Assistant:** the first time a user opens Hearth from the HA sidebar, they sign in once with their Hearth password. Their HA login is then linked and future visits sign in automatically. To skip that step, switch on **Let any Home Assistant user in** in **Settings → App settings** — any HA user who opens the panel then gets a Hearth login of their own.
 - **Admin** users can add and remove users. Everyone can edit their own name, colour and password.
 - Every transaction records which user it belongs to — from the account owner for bank transactions, or whoever jotted or imported it.
 

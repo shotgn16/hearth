@@ -1,5 +1,6 @@
-// Runtime configuration. As a Home Assistant add-on, options come from /data/options.json (written by the Supervisor).
-// Standalone, the same values come from environment variables. Values saved in Hearth's own Settings screen win over both.
+// Runtime configuration. Everything is set inside Hearth (Settings → App settings / Local AI) and stored in its database.
+// Environment variables give the starting values for standalone installs; /data/options.json from older add-on
+// versions is read once so existing installs keep their choices.
 const fs = require('fs');
 const path = require('path');
 
@@ -22,8 +23,21 @@ const config = {
   autoCreateHaUsers: !!opts.auto_create_ha_users,
   publishSensors: opts.publish_sensors !== false,
   logLevel: opts.log_level || process.env.LOG_LEVEL || 'info',
+  legacyOptions: opts,
 };
+if (isAddon && !opts.ollama_url && !process.env.OLLAMA_URL) config.ollama.url = 'http://homeassistant.local:11434';
 process.env.TZ = config.timezone;
+
+// App-wide settings saved in Hearth (Settings → App settings)
+const SYSTEM_DEFAULTS = () => ({ timezone: config.timezone, auto_create_ha_users: config.autoCreateHaUsers, publish_sensors: config.publishSensors, log_level: config.logLevel });
+function applySystem(s = {}) {
+  if (s.timezone) { config.timezone = s.timezone; process.env.TZ = s.timezone; }
+  if (s.auto_create_ha_users !== undefined) config.autoCreateHaUsers = !!s.auto_create_ha_users;
+  if (s.publish_sensors !== undefined) config.publishSensors = !!s.publish_sensors;
+  if (['debug', 'info', 'warning', 'error'].includes(s.log_level)) config.logLevel = s.log_level;
+}
+config.applySystem = applySystem;
+config.systemDefaults = SYSTEM_DEFAULTS;
 
 const LEVELS = { debug: 0, info: 1, warning: 2, error: 3 };
 const log = Object.fromEntries(Object.keys(LEVELS).map((l) => [l, (...a) => { if (LEVELS[l] >= LEVELS[config.logLevel]) console[l === 'warning' ? 'warn' : l === 'debug' ? 'log' : l](`[${l}]`, ...a); }]));
