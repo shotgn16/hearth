@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0
+- Outlook.com, Hotmail and Microsoft 365 mailboxes: sign in with Microsoft through your own Entra app registration (device-code sign-in that works inside the HA panel); receipts are read through Microsoft Graph with read-only access
+- On-premises Exchange mailboxes through Exchange Web Services (NTLM or Basic)
+- Outlook / Microsoft 365 calendars copied locally through the same Microsoft sign-in
+- Mailbox folders show their names, and the mailbox list shows the account type and sign-in state
+
 ## 1.2.0
 - Home Assistant now downloads a ready-made image instead of building Hearth on your machine
 - Email receipts: connect mailboxes over IMAP; Hearth finds receipts, invoices and bills (including PDF attachments), reads totals, references and items, and matches each to a bill, bank payment, account and month. Everything waits in an approval queue — approve, change the match, or dismiss; approvals are remembered per sender and can be undone

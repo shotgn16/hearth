@@ -62,11 +62,17 @@ async function banks(el) {
   let haCals = [];
   if (state.me.ha) haCals = await api('/homeassistant/calendars').catch(() => []);
   const linked = new Set(list.filter((c) => c.provider === 'homeassistant').map((c) => c.url));
+  const msAccts = (await api('/email/accounts').catch(() => [])).filter((a) => a.kind === 'microsoft');
+  const msLinked = new Set(list.filter((c) => c.provider === 'microsoft').map((c) => c.url));
+  const msBlock = `<div class="surface pad" style="margin-bottom:20px"><h3 style="margin-top:0">From Microsoft 365 / Outlook.com</h3>
+    ${msAccts.length ? `<p class="muted small">Uses the Microsoft sign-in from Email receipts. Tick to keep a local copy of that account's calendar.</p><ul class="list">${msAccts.map((a) => `<li><div class="main"><div class="title">${esc(a.address || a.name)}</div><div class="meta">${a.signed_in ? 'Signed in' : 'Not signed in yet — finish signing in under Email receipts'}</div></div>
+      <label class="switch"><input type="checkbox" data-mscal="${a.id}" data-name="${esc(a.address || a.name)}" ${msLinked.has(String(a.id)) ? 'checked' : ''} ${a.signed_in ? '' : 'disabled'}><i></i></label></li>`).join('')}</ul>`
+      : '<p class="muted small">Sign in with Microsoft under <a href="#/settings/email">Email receipts</a> (choose "Outlook.com / Microsoft 365") and your Outlook calendar can be copied here too — no published link needed.</p>'}</div>`;
   const haBlock = state.me.ha ? `<div class="surface pad" style="margin-bottom:20px"><h3 style="margin-top:0">From Home Assistant</h3>
     <p class="muted small">Calendars you've already connected to Home Assistant (Google, Outlook, Microsoft 365/Exchange, CalDAV, local…). Tick to keep a local copy in Hearth.</p>
     ${haCals.length ? `<ul class="list">${haCals.map((c) => `<li><div class="main"><div class="title">${esc(c.name)}</div><div class="meta">${esc(c.entity_id)}</div></div>
       <label class="switch"><input type="checkbox" data-hacal="${esc(c.entity_id)}" data-name="${esc(c.name)}" ${linked.has(c.entity_id) ? 'checked' : ''}><i></i></label></li>`).join('')}</ul>` : '<p class="muted small">No calendar entities found in Home Assistant.</p>'}</div>` : '';
-  el.innerHTML = `${haBlock}${list.length ? `<div class="surface" style="margin-bottom:20px"><ul class="list">${list.map((c) => `<li style="flex-wrap:wrap"><div class="main" style="min-width:200px"><div class="title">${esc(c.name)}</div><div class="meta">${c.provider} · ${c.last_sync ? `synced ${relDay(c.last_sync)}` : 'never synced'}${c.last_error ? ` · ⚠ ${esc(c.last_error)}` : ''}</div></div>
+  el.innerHTML = `${msBlock}${haBlock}${list.length ? `<div class="surface" style="margin-bottom:20px"><ul class="list">${list.map((c) => `<li style="flex-wrap:wrap"><div class="main" style="min-width:200px"><div class="title">${esc(c.name)}</div><div class="meta">${c.provider} · ${c.last_sync ? `synced ${relDay(c.last_sync)}` : 'never synced'}${c.last_error ? ` · ⚠ ${esc(c.last_error)}` : ''}</div></div>
       <div class="row" style="gap:6px"><label class="row small"><span class="muted">Auto</span><label class="switch"><input type="checkbox" data-auto="${c.id}" ${c.auto_sync ? 'checked' : ''}><i></i></label></label>
       <button class="btn small soft" data-sync="${c.id}">Sync now</button><button class="btn small ghost" data-full="${c.id}">Re-pull history</button><button class="btn small ghost" data-del="${c.id}">Remove</button></div></li>`).join('')}</ul></div>` : ''}
     <div class="surface pad"><h3 style="margin-top:0">Connect superFin</h3>
@@ -263,20 +269,30 @@ async function ruleSheet(r, done) {
 }
 
 // ---------- email receipts ----------
+const MS_HELP = `<b>One-time setup (about 5 minutes, free):</b><ol style="margin:6px 0 0;padding-left:18px">
+  <li>Go to <b>entra.microsoft.com</b> → Applications → App registrations → <b>New registration</b>. Name it "Hearth" and choose <b>"Accounts in any organizational directory and personal Microsoft accounts"</b>. Leave the redirect URI empty.</li>
+  <li>In the new app: <b>Authentication</b> → turn on <b>Allow public client flows</b> → Save.</li>
+  <li><b>API permissions</b> → Add → Microsoft Graph → Delegated: <b>Mail.Read</b>, <b>Calendars.Read</b>, <b>User.Read</b>, <b>offline_access</b>.</li>
+  <li>Copy the <b>Application (client) ID</b> from Overview into the box below.</li></ol>
+  <p style="margin:6px 0 0">Sign-in for: Outlook.com / Hotmail → <b>Personal</b>; work or school → <b>Work or school</b> (or your tenant ID if your organisation only allows its own apps). Hearth only asks for read access.</p>`;
 const PROVIDERS = {
   gmail: { label: 'Gmail', host: 'imap.gmail.com', port: 993, help: 'Turn on 2-Step Verification, then create an app password at myaccount.google.com/apppasswords and paste it here. Tip: make a "Receipts" label with a filter and check only that.' },
+  microsoft: { label: 'Outlook.com / Microsoft 365', kind: 'microsoft', help: MS_HELP },
   icloud: { label: 'iCloud Mail', host: 'imap.mail.me.com', port: 993, help: 'Create an app-specific password at account.apple.com → Sign-In and Security → App-Specific Passwords. Your username is your full iCloud email address.' },
   yahoo: { label: 'Yahoo Mail', host: 'imap.mail.yahoo.com', port: 993, help: 'Generate an app password in Yahoo Account Security → Generate app password.' },
   fastmail: { label: 'Fastmail', host: 'imap.fastmail.com', port: 993, help: 'Create an app password in Settings → Privacy & Security → Integrations (IMAP access).' },
-  outlook: { label: 'Outlook.com / Microsoft 365', host: 'outlook.office365.com', port: 993, help: 'Microsoft has switched off password sign-in for IMAP on most accounts and Hearth doesn\'t support Microsoft\'s OAuth sign-in yet. The reliable route: set an Outlook rule that forwards receipts to a mailbox above (or a dedicated one), and connect that instead.' },
+  ews: { label: 'Exchange on-premises (EWS)', kind: 'ews', help: 'For your own Exchange Server 2013 or newer. The EWS address is usually https://mail.yourdomain.com/EWS/Exchange.asmx. Hearth signs in with NTLM, falling back to Basic. For Exchange Online / Microsoft 365, choose "Outlook.com / Microsoft 365" instead.' },
   other: { label: 'Other (IMAP)', host: '', port: 993, help: 'Use your provider\'s IMAP server, port 993 with SSL. A dedicated receipts mailbox or folder keeps things fast and private.' },
 };
+const KIND_LABEL = { imap: 'IMAP', microsoft: 'Microsoft', ews: 'Exchange' };
 async function emailSettings(el) {
   const [list, s] = await Promise.all([api('/email/accounts'), api('/settings')]);
+  const status = (a) => (a.kind === 'microsoft' && !a.signed_in ? '<span style="color:var(--amber)">not signed in</span>' : a.last_sync ? `checked ${relDay(a.last_sync)} ${new Date(a.last_sync).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'not checked yet');
+  const fnames = (a) => a.folders.map((f) => a.folder_names?.[f] || (f === 'inbox' ? 'Inbox' : f)).join(', ');
   el.innerHTML = `<p class="muted" style="margin-top:0">Hearth checks these mailboxes for receipts, invoices and bills, reads the amount, date, references and items (including PDF attachments), and matches each to a bill, payment and account. <b>Nothing is applied until you approve it</b> in <a href="#/receipts">Email receipts</a>. Only likely receipts are downloaded; everything stays on this server.</p>
-    ${list.length ? `<div class="surface" style="margin-bottom:20px"><ul class="list">${list.map((a) => `<li style="flex-wrap:wrap"><div class="main" style="min-width:220px"><div class="title">${esc(a.name || a.username)}</div>
-      <div class="meta">${esc(a.username)} · ${esc(a.folders.join(', '))} · ${a.last_sync ? `checked ${relDay(a.last_sync)} ${new Date(a.last_sync).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'not checked yet'}${a.last_error ? ` · ⚠ ${esc(a.last_error)}` : ''}</div></div>
-      <div class="row" style="gap:6px"><label class="switch" title="Check automatically"><input type="checkbox" data-en="${a.id}" ${a.enabled ? 'checked' : ''}><i></i></label><button class="btn small soft" data-sync="${a.id}">Check now</button><button class="btn small ghost" data-edit="${a.id}">Edit</button><button class="btn small ghost" data-del="${a.id}">Remove</button></div></li>`).join('')}</ul></div>` : ''}
+    ${list.length ? `<div class="surface" style="margin-bottom:20px"><ul class="list">${list.map((a) => `<li style="flex-wrap:wrap"><div class="main" style="min-width:220px"><div class="title">${esc(a.name || a.address || a.username)} <span class="pill">${KIND_LABEL[a.kind] || 'IMAP'}</span></div>
+      <div class="meta">${esc(a.address || a.username || '')} · ${esc(fnames(a))} · ${status(a)}${a.last_error ? ` · ⚠ ${esc(a.last_error)}` : ''}</div></div>
+      <div class="row" style="gap:6px"><label class="switch" title="Check automatically"><input type="checkbox" data-en="${a.id}" ${a.enabled ? 'checked' : ''}><i></i></label>${a.kind === 'microsoft' && !a.signed_in ? `<button class="btn small" data-edit="${a.id}">Sign in</button>` : `<button class="btn small soft" data-sync="${a.id}">Check now</button>`}<button class="btn small ghost" data-edit="${a.id}">Edit</button><button class="btn small ghost" data-del="${a.id}">Remove</button></div></li>`).join('')}</ul></div>` : ''}
     <div class="row" style="margin-bottom:20px"><button class="btn" data-add>Connect a mailbox</button><span class="spacer"></span>
       <label class="row small">Check every <select id="every" style="width:auto">${[15, 30, 60, 180, 720].map((m) => `<option value="${m}" ${Number(s.email_check_minutes || 30) === m ? 'selected' : ''}>${m < 60 ? `${m} minutes` : m === 60 ? 'hour' : `${m / 60} hours`}</option>`).join('')}</select></label></div>`;
   el.querySelector('#every').onchange = (e) => api('/settings', { method: 'PUT', body: { email_check_minutes: Number(e.target.value) } }).then(() => toast('Saved'));
@@ -289,40 +305,104 @@ async function emailSettings(el) {
 
 function mailboxSheet(a, done) {
   const isNew = !a;
-  a ||= { name: '', host: '', port: 993, secure: 1, username: '', password: '', folders: ['INBOX'], lookback_days: 90, user_id: state.me.user.id };
-  const guess = Object.entries(PROVIDERS).find(([, p]) => p.host && p.host === a.host)?.[0] || (isNew ? 'gmail' : 'other');
+  a ||= { kind: 'imap', name: '', host: '', port: 993, secure: 1, username: '', password: '', folders: ['INBOX'], folder_names: {}, lookback_days: 90, user_id: state.me.user.id, graph_tenant: 'common' };
+  const guess = a.kind === 'microsoft' ? 'microsoft' : a.kind === 'ews' ? 'ews' : Object.entries(PROVIDERS).find(([, p]) => p.host && p.host === a.host)?.[0] || (isNew ? 'gmail' : 'other');
+  const tenant = a.graph_tenant || 'common', customTenant = !['common', 'consumers', 'organizations'].includes(tenant);
+  let names = { ...(a.folder_names || {}) };
+  const chip = (id, on) => `<button type="button" class="chip ${on ? 'on' : ''}" data-f="${esc(id)}">${esc(names[id] || (id === 'inbox' ? 'Inbox' : id))}</button>`;
   const { el, close } = sheet(`<h2>${isNew ? 'Connect a mailbox' : 'Edit mailbox'}</h2><form class="kv" id="mf">
-    <label class="f"><span>Provider</span><select name="provider">${Object.entries(PROVIDERS).map(([k, p]) => `<option value="${k}" ${k === guess ? 'selected' : ''}>${p.label}</option>`).join('')}</select></label>
-    <label class="f"><span>Name</span><input type="text" name="name" value="${esc(a.name || '')}" placeholder="Alex's Gmail"></label>
-    <p class="small muted" id="phelp" style="grid-column:1/-1;margin:0 0 6px"></p>
-    <label class="f"><span>Email / username</span><input type="text" name="username" value="${esc(a.username)}" required autocomplete="off"></label>
-    <label class="f"><span>App password</span><input type="password" name="password" value="${esc(a.password || '')}" ${isNew ? 'required' : ''} autocomplete="new-password"></label>
-    <label class="f"><span>IMAP server</span><input type="text" name="host" value="${esc(a.host)}" required></label>
-    <label class="f"><span>Port</span><input type="number" name="port" value="${a.port}"></label>
-    <label class="f" style="grid-column:1/-1"><span>Folders to check</span><div class="chips" id="folders" style="margin-top:6px">${a.folders.map((f) => `<button type="button" class="chip on" data-f="${esc(f)}">${esc(f)}</button>`).join('')}<span class="muted small">Press "Test" to choose from your folders</span></div></label>
+    <label class="f"><span>Provider</span><select name="provider" ${isNew ? '' : 'disabled'}>${Object.entries(PROVIDERS).map(([k, p]) => `<option value="${k}" ${k === guess ? 'selected' : ''}>${p.label}</option>`).join('')}</select></label>
+    <label class="f"><span>Name</span><input type="text" name="name" value="${esc(a.name || '')}" placeholder="Alex's email"></label>
+    <div class="small muted" id="phelp" style="grid-column:1/-1;margin:0 0 6px;line-height:1.5"></div>
+    <label class="f" data-k="microsoft"><span>Application (client) ID</span><input type="text" name="graph_client_id" value="${esc(a.graph_client_id || '')}" placeholder="00000000-0000-0000-0000-000000000000" autocomplete="off"></label>
+    <label class="f" data-k="microsoft"><span>Account type</span><select name="graph_tenant_pick">
+      <option value="common" ${tenant === 'common' ? 'selected' : ''}>Any (personal, work or school)</option><option value="consumers" ${tenant === 'consumers' ? 'selected' : ''}>Personal — Outlook.com, Hotmail, Live</option>
+      <option value="organizations" ${tenant === 'organizations' ? 'selected' : ''}>Work or school — Microsoft 365</option><option value="custom" ${customTenant ? 'selected' : ''}>A specific tenant ID</option></select></label>
+    <label class="f" data-k="microsoft" id="tenantbox" style="grid-column:1/-1${customTenant ? '' : ';display:none'}"><span>Tenant ID or domain</span><input type="text" name="graph_tenant" value="${customTenant ? esc(tenant) : ''}" placeholder="contoso.onmicrosoft.com"></label>
+    <div data-k="microsoft" id="msbox" style="grid-column:1/-1">${a.kind === 'microsoft' && a.signed_in ? `<p class="small" style="margin:0"><span style="color:var(--green)">✓ Signed in as ${esc(a.address || 'your Microsoft account')}</span> <button type="button" class="btn small ghost" data-signin>Sign in again</button></p>` : ''}</div>
+    <label class="f" data-k="ews" style="grid-column:1/-1"><span>EWS address</span><input type="url" name="ews_url" value="${esc(a.ews_url || '')}" placeholder="https://mail.yourdomain.com/EWS/Exchange.asmx"></label>
+    <label class="f" data-k="ews"><span>Domain (optional)</span><input type="text" name="ews_domain" value="${esc(a.ews_domain || '')}" placeholder="CONTOSO"></label>
+    <label class="f" data-k="imap ews"><span>Email / username</span><input type="text" name="username" value="${esc(a.username || '')}" autocomplete="off"></label>
+    <label class="f" data-k="imap ews"><span id="pwlabel">App password</span><input type="password" name="password" value="${esc(a.password || '')}" autocomplete="new-password"></label>
+    <label class="f" data-k="imap"><span>IMAP server</span><input type="text" name="host" value="${esc(a.host || '')}"></label>
+    <label class="f" data-k="imap"><span>Port</span><input type="number" name="port" value="${a.port || 993}"></label>
+    <label class="f" style="grid-column:1/-1"><span>Folders to check</span><div class="chips" id="folders" style="margin-top:6px">${a.folders.map((f) => chip(f, true)).join('')}<span class="muted small" id="fhint">${isNew ? '' : 'Press "Test" to choose from your folders'}</span></div></label>
     <label class="f"><span>On first check, look back</span><select name="lookback_days">${[[30, '1 month'], [90, '3 months'], [180, '6 months'], [365, '1 year'], [730, '2 years']].map(([v, l]) => `<option value="${v}" ${Number(a.lookback_days) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     <label class="f"><span>Whose mailbox</span><select name="user_id">${opts(state.users, a.user_id)}</select></label>
-    <details class="adv" style="grid-column:1/-1"><summary>Advanced</summary><label class="row small" style="margin-top:8px"><input type="checkbox" name="secure" ${a.secure ? 'checked' : ''}> Use SSL/TLS (port 993)</label>
-      <label class="row small"><input type="checkbox" name="allow_self_signed" ${a.allow_self_signed ? 'checked' : ''}> Allow a self-signed certificate (your own mail server)</label></details>
-    <div class="row" style="grid-column:1/-1"><span class="small" id="tres"></span><span class="spacer"></span><button type="button" class="btn soft" data-test>Test</button><button class="btn">${isNew ? 'Connect' : 'Save'}</button></div></form>`, { wide: true });
+    <details class="adv" style="grid-column:1/-1"><summary>Advanced</summary><label class="row small" style="margin-top:8px" data-k="imap"><input type="checkbox" name="secure" ${a.secure ? 'checked' : ''}> Use SSL/TLS (port 993)</label>
+      <label class="row small" data-k="imap ews"><input type="checkbox" name="allow_self_signed" ${a.allow_self_signed ? 'checked' : ''}> Allow a self-signed certificate (your own mail server)</label></details>
+    <div class="row" style="grid-column:1/-1"><span class="small" id="tres"></span><span class="spacer"></span><button type="button" class="btn soft" data-test>Test</button><button class="btn" id="go"></button></div></form>`, { wide: true });
   const f = el.querySelector('#mf');
-  const setProv = (first) => { const p = PROVIDERS[f.provider.value]; el.querySelector('#phelp').textContent = p.help; if (!first || isNew) { if (p.host) f.host.value = p.host; f.port.value = p.port; } };
+  const kind = () => PROVIDERS[f.provider.value].kind || 'imap';
+  const setProv = (first) => {
+    const p = PROVIDERS[f.provider.value], k = kind();
+    el.querySelector('#phelp').innerHTML = k === 'microsoft' ? (a.signed_in ? 'Connected through your Entra app registration. Only change the client ID or account type if you\'ve made a new app — you\'ll need to sign in again.' : p.help) : esc(p.help);
+    el.querySelectorAll('[data-k]').forEach((x) => { x.style.display = x.dataset.k.split(' ').includes(k) ? '' : 'none'; });
+    if (k === 'microsoft' && !customTenant) el.querySelector('#tenantbox').style.display = 'none';
+    el.querySelector('#pwlabel').textContent = k === 'ews' ? 'Password' : 'App password';
+    el.querySelector('#go').textContent = k === 'microsoft' && !a.signed_in ? 'Save and sign in with Microsoft' : isNew ? 'Connect' : 'Save';
+    el.querySelector('[data-test]').style.display = k === 'microsoft' && !a.signed_in ? 'none' : '';
+    if (isNew && !first && k === 'imap') { if (p.host) f.host.value = p.host; f.port.value = p.port; }
+    if (isNew) { const def = k === 'imap' ? 'INBOX' : 'inbox'; el.querySelector('#folders').innerHTML = chip(def, true) + `<span class="muted small" id="fhint">${k === 'microsoft' ? 'After signing in, press "Test" to choose other folders' : 'Press "Test" to choose from your folders'}</span>`; }
+  };
+  if (isNew && guess === 'gmail') { f.host.value = PROVIDERS.gmail.host; }
   f.provider.onchange = () => setProv(false); setProv(true);
+  f.graph_tenant_pick.onchange = () => { el.querySelector('#tenantbox').style.display = f.graph_tenant_pick.value === 'custom' ? '' : 'none'; };
   on(el, 'click', '[data-f]', (e, b) => b.classList.toggle('on'));
-  const body = () => { const d = Object.fromEntries(new FormData(f)); return { id: a.id, name: d.name || d.username, host: d.host.trim(), port: Number(d.port) || 993, secure: d.secure ? 1 : 0, allow_self_signed: d.allow_self_signed ? 1 : 0, username: d.username.trim(), password: d.password, user_id: Number(d.user_id) || null, lookback_days: Number(d.lookback_days), folders: [...el.querySelectorAll('[data-f].on')].map((x) => x.dataset.f) }; };
-  el.querySelector('[data-test]').onclick = async (e) => {
-    const t = el.querySelector('#tres'); e.target.disabled = true; t.textContent = 'Connecting…';
+  const body = () => {
+    const d = Object.fromEntries(new FormData(f)), k = kind();
+    const b = { id: a.id, kind: k, name: d.name || d.username || '', user_id: Number(d.user_id) || null, lookback_days: Number(d.lookback_days), allow_self_signed: d.allow_self_signed ? 1 : 0,
+      folders: [...el.querySelectorAll('[data-f].on')].map((x) => x.dataset.f), folder_names: names };
+    if (k === 'imap') Object.assign(b, { host: d.host.trim(), port: Number(d.port) || 993, secure: d.secure ? 1 : 0, username: d.username.trim(), password: d.password });
+    if (k === 'ews') Object.assign(b, { ews_url: d.ews_url.trim(), ews_domain: d.ews_domain.trim(), username: d.username.trim(), password: d.password });
+    if (k === 'microsoft') Object.assign(b, { graph_client_id: d.graph_client_id.trim(), graph_tenant: d.graph_tenant_pick === 'custom' ? (d.graph_tenant || '').trim() || 'common' : d.graph_tenant_pick, name: d.name || 'Microsoft' });
+    return b;
+  };
+  const test = async (btn) => {
+    const t = el.querySelector('#tres'); if (btn) btn.disabled = true; t.textContent = 'Connecting…';
     try {
       const r = await api('/email/accounts/test', { method: 'POST', body: body() });
       const chosen = new Set([...el.querySelectorAll('[data-f].on')].map((x) => x.dataset.f));
-      el.querySelector('#folders').innerHTML = r.folders.map((x) => `<button type="button" class="chip ${chosen.has(x) ? 'on' : ''}" data-f="${esc(x)}">${esc(x)}</button>`).join('');
-      t.innerHTML = '<span style="color:var(--green)">✓ Connected — pick the folders to check</span>';
+      names = Object.fromEntries(r.folders.map((x) => [x.id, x.name]));
+      el.querySelector('#folders').innerHTML = r.folders.map((x) => chip(x.id, chosen.has(x.id))).join('');
+      t.innerHTML = `<span style="color:var(--green)">✓ ${esc(r.message || 'Connected')} — pick the folders to check</span>`;
     } catch (err) { t.textContent = err.message; }
-    e.target.disabled = false;
+    if (btn) btn.disabled = false;
   };
+  el.querySelector('[data-test]').onclick = (e) => test(e.target);
+  // Microsoft device-code sign-in: show the code, poll until it's done
+  let timer = null;
+  const signIn = async (id) => {
+    const box = el.querySelector('#msbox');
+    try {
+      const r = await api(`/email/accounts/${id}/microsoft/login`, { method: 'POST', body: {} });
+      box.innerHTML = `<div class="surface pad" style="background:var(--bg-2, rgba(0,0,0,.03))"><p style="margin:0 0 8px">Open <a href="${esc(r.verification_uri)}" target="_blank" rel="noopener"><b>${esc(r.verification_uri.replace(/^https?:\/\//, ''))}</b></a> on any device and enter this code:</p>
+        <p style="font-size:28px;font-weight:700;letter-spacing:.12em;margin:4px 0 8px"><span id="mscode">${esc(r.user_code)}</span> <button type="button" class="btn small ghost" data-copy>Copy</button></p>
+        <p class="small muted" id="msstate" style="margin:0">Waiting for you to sign in… (the code lasts 15 minutes)</p></div>`;
+      box.querySelector('[data-copy]').onclick = () => navigator.clipboard?.writeText(r.user_code).then(() => toast('Code copied'));
+      clearInterval(timer);
+      timer = setInterval(async () => {
+        if (!document.body.contains(box)) return clearInterval(timer);
+        const st = await api(`/email/accounts/${id}/microsoft/status`).catch(() => null);
+        if (!st) return;
+        if (st.status === 'failed') { clearInterval(timer); box.querySelector('#msstate').innerHTML = `<span style="color:var(--red)">${esc(st.message)}</span> <button type="button" class="btn small ghost" data-signin>Try again</button>`; }
+        if (st.status === 'done' || (st.signed_in && st.status !== 'waiting')) {
+          clearInterval(timer); a = { ...a, id, kind: 'microsoft', signed_in: true, address: st.address };
+          box.innerHTML = `<p class="small" style="margin:0"><span style="color:var(--green)">✓ Signed in as ${esc(st.address || 'your Microsoft account')} — checking for receipts now.</span></p>`;
+          setProv(true); el.querySelector('#go').textContent = 'Done'; test();
+        }
+      }, 3000);
+    } catch (err) { box.innerHTML = `<p class="small" style="color:var(--red);margin:0">${esc(err.message)}</p>`; }
+  };
+  on(el, 'click', '[data-signin]', () => signIn(a.id));
   f.onsubmit = async (e) => {
-    e.preventDefault(); const b = body(); if (!b.folders.length) return toast('Pick at least one folder');
-    try { await api(isNew ? '/email/accounts' : `/email/accounts/${a.id}`, { method: isNew ? 'POST' : 'PATCH', body: b }); close(); toast(isNew ? 'Connected — checking for receipts now' : 'Saved'); done(); } catch (err) { fail(err); }
+    e.preventDefault(); const b = body(), k = b.kind;
+    if (!b.folders.length) return toast('Pick at least one folder');
+    try {
+      const saved = await api(a.id ? `/email/accounts/${a.id}` : '/email/accounts', { method: a.id ? 'PATCH' : 'POST', body: b });
+      if (k === 'microsoft' && !a.signed_in) { a = { ...a, ...saved, id: saved.id || a.id }; done(); return signIn(a.id); }
+      clearInterval(timer); close(); toast(isNew && k !== 'microsoft' ? 'Connected — checking for receipts now' : 'Saved'); done();
+    } catch (err) { fail(err); }
   };
 }
 
@@ -332,11 +412,17 @@ async function calendars(el) {
   let haCals = [];
   if (state.me.ha) haCals = await api('/homeassistant/calendars').catch(() => []);
   const linked = new Set(list.filter((c) => c.provider === 'homeassistant').map((c) => c.url));
+  const msAccts = (await api('/email/accounts').catch(() => [])).filter((a) => a.kind === 'microsoft');
+  const msLinked = new Set(list.filter((c) => c.provider === 'microsoft').map((c) => c.url));
+  const msBlock = `<div class="surface pad" style="margin-bottom:20px"><h3 style="margin-top:0">From Microsoft 365 / Outlook.com</h3>
+    ${msAccts.length ? `<p class="muted small">Uses the Microsoft sign-in from Email receipts. Tick to keep a local copy of that account's calendar.</p><ul class="list">${msAccts.map((a) => `<li><div class="main"><div class="title">${esc(a.address || a.name)}</div><div class="meta">${a.signed_in ? 'Signed in' : 'Not signed in yet — finish signing in under Email receipts'}</div></div>
+      <label class="switch"><input type="checkbox" data-mscal="${a.id}" data-name="${esc(a.address || a.name)}" ${msLinked.has(String(a.id)) ? 'checked' : ''} ${a.signed_in ? '' : 'disabled'}><i></i></label></li>`).join('')}</ul>`
+      : '<p class="muted small">Sign in with Microsoft under <a href="#/settings/email">Email receipts</a> (choose "Outlook.com / Microsoft 365") and your Outlook calendar can be copied here too — no published link needed.</p>'}</div>`;
   const haBlock = state.me.ha ? `<div class="surface pad" style="margin-bottom:20px"><h3 style="margin-top:0">From Home Assistant</h3>
     <p class="muted small">Calendars you've already connected to Home Assistant (Google, Outlook, Microsoft 365/Exchange, CalDAV, local…). Tick to keep a local copy in Hearth.</p>
     ${haCals.length ? `<ul class="list">${haCals.map((c) => `<li><div class="main"><div class="title">${esc(c.name)}</div><div class="meta">${esc(c.entity_id)}</div></div>
       <label class="switch"><input type="checkbox" data-hacal="${esc(c.entity_id)}" data-name="${esc(c.name)}" ${linked.has(c.entity_id) ? 'checked' : ''}><i></i></label></li>`).join('')}</ul>` : '<p class="muted small">No calendar entities found in Home Assistant.</p>'}</div>` : '';
-  el.innerHTML = `${haBlock}${list.length ? `<div class="surface" style="margin-bottom:20px"><ul class="list">${list.map((c) => `<li><span class="dot" style="background:${c.color};width:12px;height:12px"></span><div class="main"><div class="title">${esc(c.name)}</div><div class="meta">${esc(c.provider)} · ${c.last_sync ? `synced ${relDay(c.last_sync)}` : 'not synced yet'}${c.last_error ? ` · ⚠ ${esc(c.last_error)}` : ''}</div></div>
+  el.innerHTML = `${msBlock}${haBlock}${list.length ? `<div class="surface" style="margin-bottom:20px"><ul class="list">${list.map((c) => `<li><span class="dot" style="background:${c.color};width:12px;height:12px"></span><div class="main"><div class="title">${esc(c.name)}</div><div class="meta">${esc(c.provider)} · ${c.last_sync ? `synced ${relDay(c.last_sync)}` : 'not synced yet'}${c.last_error ? ` · ⚠ ${esc(c.last_error)}` : ''}</div></div>
       <button class="btn small soft" data-sync="${c.id}">Sync</button><button class="btn small ghost" data-del="${c.id}">Remove</button></li>`).join('')}</ul></div>` : ''}
     <div class="surface pad"><h3 style="margin-top:0">Add a calendar</h3>
       <form id="cf" class="kv"><label class="f"><span>Provider</span><select name="provider"><option value="google">Google</option><option value="outlook">Outlook.com</option><option value="exchange">Exchange / Microsoft 365</option><option value="ics">Other (iCal link)</option></select></label>
@@ -346,12 +432,17 @@ async function calendars(el) {
       <label class="f"><span>Colour</span><input type="color" name="color" value="#c2477e"></label><div class="row end" style="grid-column:1/-1"><button class="btn">Add and sync</button></div></form>
       <details class="adv"><summary>Where do I find the link?</summary><div class="small" style="color:var(--ink-2)">
         <p><b>Google:</b> calendar.google.com → Settings → pick the calendar → Integrate calendar → "Secret address in iCal format".</p>
-        <p><b>Outlook.com:</b> Settings → Calendar → Shared calendars → Publish a calendar → choose "Can view all details" → copy the ICS link.</p>
+        <p><b>Outlook.com / Microsoft 365:</b> easiest is "From Microsoft 365 / Outlook.com" above. Or publish an ICS link: Outlook.com Settings → Calendar → Shared calendars → Publish a calendar → choose "Can view all details" → copy the ICS link.</p>
         <p><b>Exchange / Microsoft 365:</b> Outlook on the web → Settings → Calendar → Shared calendars → Publish a calendar → ICS link. On-premises Exchange: ask your admin to allow calendar publishing, or use the same steps in OWA.</p>
         <p>Hearth downloads the calendar every hour and keeps a full local copy (3 years back, 2 years ahead). Events you've attached costs to are kept even if they're deleted at the source.</p></div></details></div>`;
   on(el, 'change', '[data-hacal]', async (e, i) => {
     if (i.checked) { await api('/calendars', { method: 'POST', body: { name: i.dataset.name, provider: 'homeassistant', url: i.dataset.hacal, user_id: state.me.user.id } }); toast('Syncing — events appear in a moment'); }
     else { const c = list.find((x) => x.provider === 'homeassistant' && x.url === i.dataset.hacal); if (c) await api(`/calendars/${c.id}`, { method: 'DELETE' }); }
+    setTimeout(() => calendars(el), 1500);
+  });
+  on(el, 'change', '[data-mscal]', async (e, i) => {
+    if (i.checked) { await api('/calendars', { method: 'POST', body: { name: i.dataset.name, provider: 'microsoft', url: i.dataset.mscal, user_id: state.me.user.id, color: '#2f6fd1' } }); toast('Syncing — events appear in a moment'); }
+    else { const c = list.find((x) => x.provider === 'microsoft' && x.url === i.dataset.mscal); if (c) await api(`/calendars/${c.id}`, { method: 'DELETE' }); }
     setTimeout(() => calendars(el), 1500);
   });
   el.querySelector('#cf').onsubmit = async (e) => {

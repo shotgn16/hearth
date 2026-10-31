@@ -28,6 +28,23 @@ async function syncHomeAssistant(cal) {
 
 async function syncCalendar(cal) {
   try {
+    if (cal.provider === 'microsoft') {
+      const ms = require('./microsoft'); const acctId = Number(cal.url);
+      if (!q.get(`SELECT id FROM email_accounts WHERE id=? AND household_id=? AND kind='microsoft'`, acctId, cal.household_id)) throw new Error('That Microsoft account is no longer connected');
+      const seen = new Set(); let count = 0;
+      for (let y = -3; y < 2; y++) {
+        const evs = await ms.calendarEvents(acctId, A.addDays(new Date(), y * 365).toISOString(), A.addDays(new Date(), (y + 1) * 365).toISOString());
+        for (const e of evs) {
+          if (seen.has(e.uid)) continue; seen.add(e.uid); count++;
+          q.run(`INSERT INTO events(household_id,calendar_id,uid,title,start,end,location,description,source) VALUES(?,?,?,?,?,?,?,?,?)
+                 ON CONFLICT(calendar_id,uid) DO UPDATE SET title=excluded.title, start=excluded.start, end=excluded.end, location=excluded.location, description=excluded.description`,
+            cal.household_id, cal.id, e.uid, e.title, new Date(e.start).toISOString(), e.end ? new Date(e.end).toISOString() : null, e.location, String(e.description).slice(0, 2000), 'microsoft');
+        }
+      }
+      for (const e of q.all('SELECT id, uid, budget, estimated_cost FROM events WHERE calendar_id=?', cal.id)) if (!seen.has(e.uid) && e.budget == null && e.estimated_cost == null) q.run('DELETE FROM events WHERE id=?', e.id);
+      q.run('UPDATE calendars SET last_sync=?, last_error=NULL WHERE id=?', new Date().toISOString(), cal.id);
+      return { events: count };
+    }
     if (cal.provider === 'homeassistant') {
       const { seen, count } = await syncHomeAssistant(cal);
       for (const e of q.all('SELECT id, uid, budget, estimated_cost FROM events WHERE calendar_id=?', cal.id)) if (!seen.has(e.uid) && e.budget == null && e.estimated_cost == null) q.run('DELETE FROM events WHERE id=?', e.id);

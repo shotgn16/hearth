@@ -6,7 +6,7 @@ Hearth can watch your email for receipts, invoices and bills, work out which bil
 
 ## How it works
 
-1. Every 30 minutes (you can change this) Hearth checks the mailboxes and folders you've chosen over IMAP.
+1. Every 30 minutes (you can change this) Hearth checks the mailboxes and folders you've chosen — over IMAP, Microsoft Graph (Outlook.com / Microsoft 365) or Exchange Web Services (on-premises Exchange).
 2. It looks at subjects and senders first and only downloads emails that look like receipts, so newsletters and personal mail are skipped.
 3. From each receipt it reads the shop or company, total, date, order/invoice number, account or customer number and line items — from the email itself, from **PDF attachments**, and from receipt photos if you've set a vision model. If the rule-based reader isn't sure, your local AI helps.
 4. It works out:
@@ -61,7 +61,13 @@ Removes it from the queue. You can also choose to ignore everything from that se
 
 <img src="images/email-connect.jpg" alt="Connecting a mailbox" width="100%">
 
-Pick your provider, enter your email address and an **app password**, press **Test**, choose the folders to check, and **Connect**. Hearth looks back over the period you choose (3 months by default) the first time, then only at new mail.
+Pick your provider, enter your details, press **Test**, choose the folders to check, and **Connect**. Hearth looks back over the period you choose (3 months by default) the first time, then only at new mail.
+
+There are three kinds of mailbox:
+
+- **IMAP** with an app password — Gmail, iCloud, Yahoo, Fastmail, your own server.
+- **Outlook.com / Microsoft 365** — sign in with Microsoft through your own Entra app (below).
+- **Exchange on-premises (EWS)** — your own Exchange Server.
 
 | Provider | Server | Password |
 |---|---|---|
@@ -70,7 +76,41 @@ Pick your provider, enter your email address and an **app password**, press **Te
 | Yahoo Mail | `imap.mail.yahoo.com`, 993 | Account Security → Generate app password |
 | Fastmail | `imap.fastmail.com`, 993 | Settings → Privacy & Security → Integrations |
 | Your own server | your IMAP host, 993 | your mailbox password (there's an option for self-signed certificates) |
-| Outlook.com / Microsoft 365 | — | Microsoft now requires its own OAuth sign-in for IMAP, which Hearth doesn't support yet. Set up an Outlook rule that **forwards receipts** to one of the mailboxes above (or a dedicated receipts mailbox) and connect that. |
+
+### Outlook.com, Hotmail and Microsoft 365
+
+Microsoft has switched off password sign-in, so Hearth signs in with Microsoft using a free **Entra app registration** that you own (the same approach as LifeHub). Nothing goes through a third-party service: Hearth talks to Microsoft Graph directly and keeps a sign-in token in its own database.
+
+**1. Create the app (once, about 5 minutes).** Any Microsoft account can do this, including a personal Outlook.com one.
+
+1. Go to [entra.microsoft.com](https://entra.microsoft.com) → **Applications → App registrations → New registration**.
+2. Name it `Hearth`. Under *Supported account types* choose **Accounts in any organizational directory and personal Microsoft accounts**. Leave *Redirect URI* empty. **Register**.
+3. **Authentication** → *Advanced settings* → set **Allow public client flows** to **Yes** → **Save**.
+4. **API permissions** → **Add a permission** → **Microsoft Graph** → **Delegated permissions** → tick **Mail.Read**, **Calendars.Read**, **User.Read** and **offline_access** → **Add permissions**. (Work accounts: if your organisation requires it, an admin presses **Grant admin consent**.)
+5. From **Overview**, copy the **Application (client) ID**.
+
+**2. Connect it in Hearth.** **Settings → Email receipts → Connect a mailbox** → *Outlook.com / Microsoft 365*:
+
+- **Application (client) ID** — paste it.
+- **Account type** — *Personal* for Outlook.com / Hotmail / Live, *Work or school* for Microsoft 365, *Any* if you're not sure, or *A specific tenant ID* if your organisation only allows apps registered in its own tenant (register the app there with *Accounts in this organizational directory only*).
+- **Save and sign in with Microsoft.** Hearth shows a short code. Open **microsoft.com/devicelogin** on any device (your phone is fine), enter the code and sign in. Hearth notices within a few seconds, checks for receipts straight away, and lists your folders so you can pick e.g. a *Receipts* folder.
+
+Hearth only asks for read access. It stays signed in using a refresh token; if that expires (for example after a password change), the mailbox shows **Sign in** — press it and enter a new code. Changing the client ID or account type also asks you to sign in again. One app registration can be used for every mailbox in the household.
+
+The same sign-in can copy your Outlook calendar too — see [Calendars](calendars-and-events.md).
+
+### Exchange on-premises (EWS)
+
+For your own Exchange Server 2013 or newer, choose *Exchange on-premises (EWS)*:
+
+| Field | Example |
+|---|---|
+| EWS address | `https://mail.yourdomain.com/EWS/Exchange.asmx` |
+| Domain (optional) | `CONTOSO` |
+| Username | `alex` or `alex@yourdomain.com` |
+| Password | your mailbox password |
+
+Hearth signs in with NTLM and falls back to Basic. Tick *Allow a self-signed certificate* under **Advanced** if your server uses one. For Exchange Online (Microsoft 365) use the Microsoft sign-in above — Microsoft has retired EWS there.
 
 **Tips**
 
@@ -88,6 +128,6 @@ Pick your provider, enter your email address and an **app password**, press **Te
 
 ## Privacy
 
-Mail is read directly from your provider by the add-on and processed on your Home Assistant machine. Only emails that look like receipts are downloaded; their text and PDF/image attachments are stored in Hearth's data folder (and included in HA backups). If AI help is on, receipt text goes only to your own Ollama server. Mailbox passwords are stored in Hearth's database — use app passwords, which you can revoke at any time.
+Mail is read directly from your provider (IMAP, Microsoft Graph or your Exchange server) by the add-on and processed on your Home Assistant machine. Only emails that look like receipts are downloaded; their text and PDF/image attachments are stored in Hearth's data folder (and included in HA backups). If AI help is on, receipt text goes only to your own Ollama server. Mailbox passwords and Microsoft sign-in tokens are stored in Hearth's database — use app passwords where you can; Microsoft access can be revoked at any time from your account's *Apps and services* page (or by deleting the Entra app).
 
 Next: [Unexpected costs and work expenses](unexpected-and-work.md)

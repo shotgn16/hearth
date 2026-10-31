@@ -124,7 +124,7 @@ async function tick() {
       if (changed) await afterNewTransactions(hid);
       // email receipts: check each mailbox, then re-check pending suggestions (the bank payment may have arrived since)
       let newReceipts = 0;
-      for (const acct of q.all('SELECT * FROM email_accounts WHERE household_id=? AND enabled=1', hid)) {
+      for (const acct of q.all(`SELECT * FROM email_accounts WHERE household_id=? AND enabled=1 AND (kind IS NOT 'microsoft' OR graph_refresh_token IS NOT NULL)`, hid)) {
         if (hoursSince(acct.last_sync) * 60 >= getSetting(hid, 'email_check_minutes', 30)) { try { newReceipts += (await require('./email').syncAccount(acct)).found; } catch (e) { log.warning('email sync', acct.name, e.message); } }
       }
       if (changed || newReceipts) require('./email').rematchPending(hid);

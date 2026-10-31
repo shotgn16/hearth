@@ -60,7 +60,13 @@ Set a **vision model** in **Settings → Local AI** (or the add-on options).
 ## Email receipts
 
 **"Couldn't sign in" when connecting a mailbox.**
-Most providers need an **app password** for IMAP, not your normal password — see [Connecting a mailbox](email-receipts.md#connecting-a-mailbox). Outlook.com and Microsoft 365 need OAuth, which isn't supported yet; forward receipts to another mailbox instead.
+Most providers need an **app password** for IMAP, not your normal password — see [Connecting a mailbox](email-receipts.md#connecting-a-mailbox). Outlook.com and Microsoft 365 don't use passwords — choose *Outlook.com / Microsoft 365* and sign in with Microsoft through your Entra app ([setup](email-receipts.md#outlookcom-hotmail-and-microsoft-365)).
+
+**Microsoft sign-in says the application wasn't found (AADSTS700016) or isn't allowed.**
+Check the client ID, and that the account type matches the app: an app registered for *this organizational directory only* needs *A specific tenant ID*; personal Outlook.com accounts need the app to allow *personal Microsoft accounts*. *AADSTS7000218* means **Allow public client flows** is still off.
+
+**Microsoft mailbox shows "Sign in" again.**
+The sign-in token has expired or been revoked (e.g. after a password change). Press **Sign in** and enter the new code.
 
 **A receipt was matched to the wrong bill.**
 Press **Change**, pick the right one, and approve. Hearth remembers the sender for next time.

@@ -39,7 +39,7 @@ function haIdentity(req) {
 // ---------------- public: first-run setup + login ----------------
 api.get('/status', (req, res) => {
   const ha = haIdentity(req);
-  res.json({ needsSetup: !q.get('SELECT 1 FROM users LIMIT 1'), version: process.env.HEARTH_VERSION || '1.2.0', addon: config.isAddon, ha_user: ha ? { name: ha.name } : null });
+  res.json({ needsSetup: !q.get('SELECT 1 FROM users LIMIT 1'), version: process.env.HEARTH_VERSION || '1.3.0', addon: config.isAddon, ha_user: ha ? { name: ha.name } : null });
 });
 
 // Opening Hearth from the HA sidebar signs you in as your HA user once linked
@@ -313,31 +313,61 @@ api.post('/tracker/mark', wrap(async (req, res) => { const b = req.body; tracker
 
 // ---------------- email receipts (IMAP) ----------------
 const email = require('./email');
-const EMAIL_FIELDS = ['user_id', 'name', 'host', 'port', 'secure', 'username', 'password', 'folders', 'lookback_days', 'enabled', 'allow_self_signed'];
-const safeAcct = (a) => ({ ...a, password: a.password ? '••••••' : '', state: undefined, folders: JSON.parse(a.folders || '["INBOX"]') });
+const EMAIL_FIELDS = ['user_id', 'name', 'kind', 'host', 'port', 'secure', 'username', 'password', 'folders', 'folder_names', 'lookback_days', 'enabled', 'allow_self_signed', 'address', 'graph_client_id', 'graph_tenant', 'ews_url', 'ews_domain'];
+const JSON_FIELDS = ['folders', 'folder_names'];
+const safeAcct = (a) => ({ ...a, password: a.password ? '••••••' : '', graph_refresh_token: undefined, signed_in: a.kind === 'microsoft' ? !!a.graph_refresh_token : undefined, state: undefined,
+  folders: JSON.parse(a.folders || '["INBOX"]'), folder_names: JSON.parse(a.folder_names || '{}'), login: a.kind === 'microsoft' ? require('./microsoft').loginStatus(a.id) : undefined });
+const fieldVal = (k, v) => (JSON_FIELDS.includes(k) ? JSON.stringify(v) : typeof v === 'boolean' ? (v ? 1 : 0) : v);
 api.get('/email/accounts', (req, res) => res.json(q.all('SELECT * FROM email_accounts WHERE household_id=? ORDER BY id', req.hid).map(safeAcct)));
 api.post('/email/accounts/test', wrap(async (req, res) => {
-  let b = { secure: 1, port: 993, ...req.body };
-  if (b.id && (!b.password || b.password === '••••••')) b.password = q.get('SELECT password FROM email_accounts WHERE id=? AND household_id=?', b.id, req.hid)?.password;
-  try { res.json({ ok: true, folders: await email.testConnection(b) }); }
+  let b = { secure: 1, port: 993, kind: 'imap', ...req.body };
+  if (b.id) { const saved = q.get('SELECT * FROM email_accounts WHERE id=? AND household_id=?', b.id, req.hid); if (saved) b = { ...saved, ...b, password: !b.password || b.password === '••••••' ? saved.password : b.password, graph_refresh_token: saved.graph_refresh_token }; }
+  try { const r = await email.testConnection(b); res.json({ ok: true, ...r }); }
   catch (e) { throw err(`Couldn't sign in: ${e.responseText || e.message}${/auth|login|credentials/i.test(e.responseText || e.message) ? ' — most providers need an app password for IMAP (see the help below).' : ''}`); }
 }));
 api.post('/email/accounts', wrap(async (req, res) => {
-  const b = req.body; if (!b.host || !b.username || !b.password) throw err('Server, username and password are needed');
+  const b = req.body; const kind = b.kind || 'imap';
+  if (kind === 'imap' && (!b.host || !b.username || !b.password)) throw err('Server, username and password are needed');
+  if (kind === 'microsoft' && !b.graph_client_id) throw err('The Application (client) ID from your Entra app registration is needed');
+  if (kind === 'ews' && (!b.ews_url || !b.username || !b.password)) throw err('EWS URL, username and password are needed');
+  if (kind !== 'imap' && !b.folders) b.folders = ['inbox'];
   const keys = EMAIL_FIELDS.filter((k) => b[k] !== undefined);
   const id = Number(q.run(`INSERT INTO email_accounts(household_id${keys.map((k) => `,${k}`).join('')}) VALUES(?${keys.map(() => ',?').join('')})`, req.hid,
-    ...keys.map((k) => (k === 'folders' ? JSON.stringify(b[k]) : typeof b[k] === 'boolean' ? (b[k] ? 1 : 0) : b[k]))).lastInsertRowid);
+    ...keys.map((k) => fieldVal(k, b[k]))).lastInsertRowid);
   const acct = q.get('SELECT * FROM email_accounts WHERE id=?', id);
+  if (kind === 'microsoft') return res.json(safeAcct(acct)); // sync starts once signed in
   email.syncAccount(acct).then((r) => { if (r.found) notify(req.hid, { title: 'Receipts found in your email', body: `${r.found} to check`, url: '/#/receipts' }); }).catch((e) => log.warning('first email sync', e.message));
   res.json(safeAcct(acct));
 }));
 api.patch('/email/accounts/:id', (req, res) => {
   const b = req.body;
-  for (const k of EMAIL_FIELDS) if (b[k] !== undefined && !(k === 'password' && (b[k] === '••••••' || b[k] === ''))) q.run(`UPDATE email_accounts SET ${k}=? WHERE id=? AND household_id=?`, k === 'folders' ? JSON.stringify(b[k]) : typeof b[k] === 'boolean' ? (b[k] ? 1 : 0) : b[k], req.params.id, req.hid);
+  const before = q.get('SELECT graph_client_id, graph_tenant FROM email_accounts WHERE id=? AND household_id=?', req.params.id, req.hid);
+  if (!before) return res.status(404).json({ error: 'Not found' });
+  for (const k of EMAIL_FIELDS) if (b[k] !== undefined && !(k === 'password' && (b[k] === '••••••' || b[k] === ''))) q.run(`UPDATE email_accounts SET ${k}=? WHERE id=? AND household_id=?`, fieldVal(k, b[k]), req.params.id, req.hid);
+  // a different Entra app or tenant means signing in again
+  if ((b.graph_client_id !== undefined && b.graph_client_id !== before.graph_client_id) || (b.graph_tenant !== undefined && b.graph_tenant !== before.graph_tenant)) {
+    require('./microsoft').forget(req.params.id);
+    q.run('UPDATE email_accounts SET graph_refresh_token=NULL WHERE id=?', req.params.id);
+  }
   if (b.folders !== undefined || b.lookback_days !== undefined) q.run(`UPDATE email_accounts SET state='{}' WHERE id=? AND household_id=?`, req.params.id, req.hid);
   res.json({ ok: true });
 });
-api.delete('/email/accounts/:id', (req, res) => { q.run('DELETE FROM email_accounts WHERE id=? AND household_id=?', req.params.id, req.hid); res.json({ ok: true }); });
+// Microsoft sign-in (device code): start it, then poll its status from the page
+api.post('/email/accounts/:id/microsoft/login', wrap(async (req, res) => {
+  const a = q.get(`SELECT * FROM email_accounts WHERE id=? AND household_id=? AND kind='microsoft'`, req.params.id, req.hid); if (!a) throw err('Not found', 404);
+  const info = await require('./microsoft').startLogin(a);
+  res.json({ user_code: info.user_code, verification_uri: info.verification_uri, message: info.message, expires: info.expires });
+}));
+api.get('/email/accounts/:id/microsoft/status', (req, res) => {
+  const a = q.get('SELECT id, graph_refresh_token, address FROM email_accounts WHERE id=? AND household_id=?', req.params.id, req.hid); if (!a) return res.status(404).json({ error: 'Not found' });
+  const st = require('./microsoft').loginStatus(a.id);
+  if (st?.status === 'done' && !st.synced) { st.synced = true; const full = q.get('SELECT * FROM email_accounts WHERE id=?', a.id); email.syncAccount(full).catch((e) => log.warning('first Microsoft sync', e.message)); }
+  res.json({ ...(st || {}), signed_in: !!a.graph_refresh_token, address: a.address });
+});
+api.delete('/email/accounts/:id', (req, res) => {
+  if (q.run('DELETE FROM email_accounts WHERE id=? AND household_id=?', req.params.id, req.hid).changes) require('./microsoft').forget(req.params.id);
+  res.json({ ok: true });
+});
 api.post('/email/accounts/:id/sync', wrap(async (req, res) => {
   const a = q.get('SELECT * FROM email_accounts WHERE id=? AND household_id=?', req.params.id, req.hid); if (!a) throw err('Not found', 404);
   try { res.json(await email.syncAccount(a, { full: !!req.body.full })); } catch (e) { throw err(`Mailbox check failed: ${e.responseText || e.message}`); }

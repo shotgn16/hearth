@@ -10,6 +10,8 @@ Birthdays, holidays, school trips and weddings are where budgets usually go wron
 
 **From Home Assistant (recommended).** Every calendar entity you've connected to HA is listed — Google Calendar, Microsoft 365/Outlook/Exchange, CalDAV, local calendars. Tick to copy. This is the easiest way to get Exchange and Microsoft 365 calendars in, because HA handles the sign-in.
 
+**From Microsoft 365 / Outlook.com.** If you've signed in with Microsoft under [Email receipts](email-receipts.md#outlookcom-hotmail-and-microsoft-365), each signed-in account is listed here — tick to keep a local copy of its calendar through Microsoft Graph. No published link needed, and private event details come through.
+
 **By iCal link.** For calendars not in HA, choose the provider and paste the ICS link:
 
 - **Google:** calendar.google.com → Settings → choose the calendar → *Integrate calendar* → *Secret address in iCal format*.

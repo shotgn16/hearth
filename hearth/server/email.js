@@ -242,10 +242,21 @@ function client(acct) {
     tls: { rejectUnauthorized: acct.allow_self_signed ? false : true }, socketTimeout: 60000, greetingTimeout: 20000 });
 }
 
+// Header-only check used by every mailbox type before downloading a full message
+function looksLikely(hid, { subject = '', fromName = '', fromEmail = '', hasDoc = false }) {
+  const memo = learned(hid, fromEmail);
+  if (memo?.ignore) return false;
+  const pre = (SUBJECT_YES.test(subject) ? 3 : 0) + (SUBJECT_NO.test(subject) ? -4 : 0) + (FROM_YES.test(`${fromName} ${fromEmail}`) ? 1 : 0) + (hasDoc ? 2 : 0) + (memo ? 4 : 0);
+  return pre >= 2;
+}
+
+// Returns the mailbox's folders as [{ id, name }]
 async function testConnection(acct) {
+  if (acct.kind === 'microsoft') return require('./microsoft').test(acct);
+  if (acct.kind === 'ews') return require('./ews').test(acct);
   const c = client(acct);
   await c.connect();
-  try { const list = await c.list(); return list.map((f) => f.path); } finally { await c.logout().catch(() => {}); }
+  try { const list = await c.list(); return { folders: list.map((f) => ({ id: f.path, name: f.path })), message: 'Connected' }; } finally { await c.logout().catch(() => {}); }
 }
 
 const BATCH = 200;
@@ -258,6 +269,14 @@ function syncAccount(acct, opts = {}) {
 }
 async function doSync(acct, { full = false } = {}) {
   const hid = acct.household_id;
+  if (acct.kind === 'microsoft' || acct.kind === 'ews') {
+    const provider = require(acct.kind === 'microsoft' ? './microsoft' : './ews');
+    try {
+      const r = await provider.sync(acct, { full, looksLikely: (m) => looksLikely(hid, m), processMessage });
+      q.run('UPDATE email_accounts SET state=?, last_sync=?, last_error=NULL WHERE id=?', JSON.stringify(r.state), new Date().toISOString(), acct.id);
+      return { found: r.found, scanned: r.scanned };
+    } catch (e) { q.run('UPDATE email_accounts SET last_error=?, last_sync=? WHERE id=?', e.message, new Date().toISOString(), acct.id); throw e; }
+  }
   const state = full ? {} : JSON.parse(acct.state || '{}');
   const folders = JSON.parse(acct.folders || '["INBOX"]');
   const c = client(acct);
@@ -291,10 +310,7 @@ async function doSync(acct, { full = false } = {}) {
             if (firstRun && env.date && new Date(env.date) < since) continue;
             const fromEmail = (from.address || '').toLowerCase();
             const hasDoc = JSON.stringify(m.bodyStructure || {}).match(/"(application\/pdf|image\/(jpeg|png))"|invoice|receipt/i);
-            const memo = learned(hid, fromEmail);
-            if (memo?.ignore) continue;
-            const pre = (SUBJECT_YES.test(env.subject || '') ? 3 : 0) + (SUBJECT_NO.test(env.subject || '') ? -4 : 0) + (FROM_YES.test(`${from.name} ${fromEmail}`) ? 1 : 0) + (hasDoc ? 2 : 0) + (memo ? 4 : 0);
-            if (pre >= 2) likely.push(m.uid);
+            if (looksLikely(hid, { subject: env.subject || '', fromName: from.name || '', fromEmail, hasDoc: !!hasDoc })) likely.push(m.uid);
           }
           for (const uid of likely) {
             const msg = await c.fetchOne(String(uid), { source: true }, { uid: true });
@@ -417,4 +433,4 @@ function attachmentPath(hid, id, name) {
   return { file: path.join(RECEIPT_DIR, String(id), a.name), type: a.type, name: a.name };
 }
 
-module.exports = { syncAccount, testConnection, processMessage, list, detail, approve, ignore, undo, rematch, rematchPending, attachmentPath, match, receiptScore, extractHeuristic, htmlToText };
+module.exports = { looksLikely, syncAccount, testConnection, processMessage, list, detail, approve, ignore, undo, rematch, rematchPending, attachmentPath, match, receiptScore, extractHeuristic, htmlToText };

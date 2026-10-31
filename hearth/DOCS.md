@@ -35,7 +35,7 @@ For older history, **Import statements** takes CSV, OFX/QFX and QIF from any UK 
 - **Money** — list on phones, spreadsheet-style grid on desktop with bulk edits, saved views and CSV export. Type a question into search (e.g. *coffee over £5 in September*) and press Enter to let the AI build the filter.
 - **Plan** — budgets, savings targets and the year planner (categories × months; actuals fill themselves in).
 - **Regular payments** — every subscription and bill with its payment date; a monthly checklist ticked off as payments come out (or by you); ongoing, cancelling, paused and ended (with last payment); a 12-month history grid.
-- **Email receipts** — connect a mailbox (Settings → Email receipts) and Hearth collects receipts and bills, matches them to the right bill, payment and account, and waits for you to approve.
+- **Email receipts** — connect a mailbox (Settings → Email receipts: IMAP, Outlook.com / Microsoft 365 via your own Entra app, or on-premises Exchange) and Hearth collects receipts and bills, matches them to the right bill, payment and account, and waits for you to approve.
 - **Unexpected & work** — flag unplanned costs to see what to put aside each month; track work expenses from to claim → claimed → paid back and export them for a claim.
 - **Insights** — this month, year on year, forecasts, pivot reports and AI monthly reviews.
 
@@ -45,7 +45,7 @@ All of this works with no tokens or setup because Hearth runs as an add-on:
 
 **Notifications.** In **Settings → Workflows**, any "Send a notification" action can target your HA notify services (e.g. `notify.mobile_app_jacks_iphone`). Tapping the notification on your phone opens Hearth. **Settings → Integrations** lets you pick services that receive *every* Hearth notification (budget alerts, morning summary, new subscriptions…).
 
-**Calendars.** **Settings → Calendars → From Home Assistant** lists your HA calendar entities — Google, Outlook, Microsoft 365/Exchange, CalDAV or local — tick the ones to copy. Hearth keeps a local copy (3 years back, 2 ahead) and lets you put budgets and real costs on events. Calendars that aren't in HA can still be added with an iCal link.
+**Calendars.** Signed-in Microsoft accounts can copy their Outlook calendar directly (**Settings → Calendars → From Microsoft 365 / Outlook.com**). **Settings → Calendars → From Home Assistant** lists your HA calendar entities — Google, Outlook, Microsoft 365/Exchange, CalDAV or local — tick the ones to copy. Hearth keeps a local copy (3 years back, 2 ahead) and lets you put budgets and real costs on events. Calendars that aren't in HA can still be added with an iCal link.
 
 **Sensors.** Updated every 15 minutes:
 
