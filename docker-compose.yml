@@ -17,7 +17,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
-  # Optional HTTPS on your LAN (needed to install on phones / receive push):
+  # Optional HTTPS on your LAN (needed to install it on phones as an app):
   #   docker compose --profile https up -d   → https://<server>:8443
   caddy:
     image: caddy:2-alpine

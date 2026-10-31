@@ -75,7 +75,7 @@ async function applyActions(hid, rule, ctx, isTx) {
       }
       case 'notify':
         await notify(hid, { title: fill(a.title || rule.name, ctx), body: fill(a.message || '{merchant} {amount}', ctx), url: a.url || '/#/inbox' },
-          { userIds: a.user_ids, deviceIds: a.device_ids, haServices: a.ha_services, ntfy: a.ntfy });
+          { haServices: a.ha_services, ntfy: a.ntfy });
         break;
     }
   }

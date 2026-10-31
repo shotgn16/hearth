@@ -1,9 +1,7 @@
 import { state, api, esc, fmt, niceDate, relDay, sheet, toast, fail, on, opts, icons, loadRefs, token, iso } from './core.js';
-import { enablePush } from './app.js';
 
 const SECTIONS = [
   ['people', 'People & household', 'Add your partner or family, and people you spend on'],
-  ['devices', 'Devices & notifications', 'Every phone and computer that has signed in'],
   ['banks', 'Bank connections', 'superFin / SimpleFIN and other bank feeds'],
   ['import', 'Import statements', 'CSV, OFX or QIF files from any bank — years of history'],
   ['categories', 'Categories & tags', 'Names, colours and icons'],
@@ -21,7 +19,7 @@ export async function renderSettings(el, parts) {
     return;
   }
   document.querySelector('.topbar h1').textContent = SECTIONS.find((x) => x[0] === s)?.[1] || 'Settings';
-  return ({ people, devices, banks, import: importer, categories, workflows, calendars, integrations, data, ai: aiSettings })[s]?.(el);
+  return ({ people, banks, import: importer, categories, workflows, calendars, integrations, data, ai: aiSettings })[s]?.(el);
 }
 
 // ---------- people ----------
@@ -55,24 +53,6 @@ async function people(el) {
   el.querySelector('[data-addperson]').onclick = async () => { const name = prompt('Name'); if (!name) return; await api('/people', { method: 'POST', body: { name } }); people(el); };
   on(el, 'change', '[data-pcolor]', async (e, i) => { await api(`/people/${i.dataset.pcolor}`, { method: 'PATCH', body: { color: i.value } }); });
   on(el, 'click', '[data-delperson]', async (e, b) => { await api(`/people/${b.dataset.delperson}`, { method: 'DELETE' }); people(el); });
-}
-
-// ---------- devices ----------
-async function devices(el) {
-  const list = await api('/devices');
-  const cur = list.find((d) => d.is_current);
-  el.innerHTML = `<div class="surface pad" style="margin-bottom:20px"><b>This device: ${esc(cur?.name || 'Unknown')}</b>
-      <p class="muted small" style="margin:4px 0 12px">${cur?.can_push ? 'Notifications are on here.' : 'Turn on notifications so workflows can reach you on this device. On iPhone and iPad, add Hearth to your Home Screen first.'}</p>
-      <button class="btn" data-push>${cur?.can_push ? 'Re-register notifications' : 'Turn on notifications here'}</button></div>
-    <h3>All devices in your household</h3><p class="muted small">Recognised automatically when someone signs in — including the Home Assistant app. Pick these as targets in Workflows.</p>
-    <div class="surface"><ul class="list">${list.map((d) => `<li style="flex-wrap:wrap"><div class="main" style="min-width:200px"><div class="title">${esc(d.name)}${d.is_current ? ' · this one' : ''}</div><div class="meta">${esc(d.user_name)} · ${esc(d.platform)} · ${esc(d.browser)} · last used ${relDay(d.last_seen)}${d.can_push ? ' · can notify' : ' · notifications off'}</div></div>
-      <div class="row" style="gap:6px"><label class="switch" title="Allow notifications"><input type="checkbox" data-n="${d.id}" ${d.notify_enabled ? 'checked' : ''}><i></i></label>
-      ${d.can_push ? `<button class="btn small soft" data-test="${d.id}">Test</button>` : ''}<button class="btn small ghost" data-rename="${d.id}">Rename</button><button class="btn small ghost" data-forget="${d.id}">Forget</button></div></li>`).join('')}</ul></div>`;
-  el.querySelector('[data-push]').onclick = async () => { await enablePush(); devices(el); };
-  on(el, 'change', '[data-n]', async (e, i) => api(`/devices/${i.dataset.n}`, { method: 'PATCH', body: { notify_enabled: i.checked } }));
-  on(el, 'click', '[data-test]', async (e, b) => { await api(`/devices/${b.dataset.test}/test`, { method: 'POST' }); toast('Sent'); });
-  on(el, 'click', '[data-rename]', async (e, b) => { const n = prompt('Name this device', list.find((d) => d.id === Number(b.dataset.rename)).name); if (n) { await api(`/devices/${b.dataset.rename}`, { method: 'PATCH', body: { name: n } }); devices(el); } });
-  on(el, 'click', '[data-forget]', async (e, b) => { if (confirm('Forget this device? It will be recognised again next time it signs in.')) { await api(`/devices/${b.dataset.forget}`, { method: 'DELETE' }); devices(el); } });
 }
 
 // ---------- banks ----------
@@ -204,7 +184,7 @@ const ACTIONS = [['set_category', 'Set category'], ['add_tag', 'Add tag'], ['set
 
 async function workflows(el) {
   const list = await api('/rules');
-  el.innerHTML = `<div class="row" style="margin-bottom:14px"><p class="muted" style="margin:0;flex:1">Workflows run on their own. Use them to file things your way, send notifications to chosen devices, or trigger Home Assistant.</p><button class="btn" data-new>New workflow</button></div>
+  el.innerHTML = `<div class="row" style="margin-bottom:14px"><p class="muted" style="margin:0;flex:1">Workflows run on their own. Use them to file things your way, send notifications to your phones through Home Assistant, or trigger automations.</p><button class="btn" data-new>New workflow</button></div>
     ${state.me.ai?.enabled ? `<form id="dw" class="row" style="margin-bottom:18px"><input type="text" name="t" placeholder="Describe it: “ping Sam's phone when we spend over £100 at Amazon”" style="flex:1"><button class="btn soft">Build it</button></form>` : ''}
     ${list.length ? `<div class="surface"><ul class="list">${list.map((r) => `<li class="tap" data-edit="${r.id}"><label class="switch" onclick="event.stopPropagation()"><input type="checkbox" data-en="${r.id}" ${r.enabled ? 'checked' : ''}><i></i></label>
       <div class="main"><div class="title">${esc(r.name)}</div><div class="meta">When ${esc((TRIGGERS.find((t) => t[0] === r.trigger) || [, r.trigger])[1].toLowerCase())} · ran ${r.run_count} times</div></div><span class="muted">›</span></li>`).join('')}</ul></div>`
@@ -220,8 +200,7 @@ async function workflows(el) {
 }
 
 async function ruleSheet(r, done) {
-  const [devs, settings] = await Promise.all([api('/devices'), api('/settings')]);
-  let haServices = []; if (settings.homeassistant?.url) haServices = await api('/homeassistant/services').catch(() => []);
+  const haServices = state.me.ha ? await api('/homeassistant/services').catch(() => []) : [];
   r ||= { name: '', trigger: 'transaction_created', match_all: 1, conditions: '[{"field":"merchant","op":"contains","value":""}]', actions: '[{"type":"set_category","value":""}]', priority: 100, stop_processing: 0 };
   let conds = JSON.parse(r.conditions), acts = JSON.parse(r.actions);
   const valueInput = (c, i) => {
@@ -240,11 +219,9 @@ async function ruleSheet(r, done) {
       case 'set_kind': return `<select data-av="${i}">${['one_off', 'subscription', 'bill'].map((k) => `<option ${a.value === k ? 'selected' : ''}>${k}</option>`).join('')}</select>`;
       case 'set_color': return `<input type="color" data-av="${i}" value="${a.value || '#d9962b'}">`;
       case 'notify': return `<input type="text" data-at="${i}" value="${esc(a.title || '')}" placeholder="Title, e.g. Big spend"><input type="text" data-am="${i}" value="${esc(a.message || '{amount} at {merchant}')}" placeholder="Message — use {amount}, {merchant}, {name}, {pct}">
-        <div class="small muted" style="margin-top:6px">Send to (leave all unticked for everyone's devices):</div><div class="chips" style="margin-top:6px">
-        ${state.users.map((u) => `<button type="button" class="chip ${(a.user_ids || []).includes(u.id) ? 'on' : ''}" data-usr="${i}:${u.id}">${esc(u.name)} · all devices</button>`).join('')}
-        ${devs.filter((d) => d.can_push).map((d) => `<button type="button" class="chip ${(a.device_ids || []).includes(d.id) ? 'on' : ''}" data-dev="${i}:${d.id}">${esc(d.user_name)} · ${esc(d.name)}</button>`).join('')}
-        ${haServices.map((s) => `<button type="button" class="chip ${(a.ha_services || []).includes(s) ? 'on' : ''}" data-ha="${i}:${s}">🏠 ${esc(s)}</button>`).join('')}
-        ${!devs.some((d) => d.can_push) && !haServices.length ? '<span class="muted small">No devices have notifications on yet — see Devices.</span>' : ''}</div>`;
+        <div class="small muted" style="margin-top:6px">Send to (leave all unticked to use the services chosen in Settings → Integrations; it always appears in Hearth's inbox):</div><div class="chips" style="margin-top:6px">
+        ${haServices.map((s) => `<button type="button" class="chip ${(a.ha_services || []).includes(s) ? 'on' : ''}" data-ha="${i}:${s}">${esc(s.replace('notify.', ''))}</button>`).join('')}
+        ${!haServices.length ? '<span class="muted small">Connect Home Assistant (Settings → Integrations) to send to your phones, or switch on ntfy.</span>' : ''}</div>`;
       case 'ha_event': return `<input type="text" data-av="${i}" value="${esc(a.value || 'hearth_event')}" placeholder="Event type, e.g. hearth_big_spend"><div class="small muted">Use it as an Event trigger in a Home Assistant automation. Data includes merchant, amount, category_id and date.</div>`;
       case 'ha_service': return `<input type="text" data-av="${i}" value="${esc(a.value || '')}" placeholder="light.turn_on"><input type="text" data-ad="${i}" value="${esc(a.data || '')}" placeholder='{"entity_id":"light.hallway","color_name":"orange"}'><div class="small muted">Data is JSON; {merchant} and {amount} are filled in.</div>`;
       default: return `<input type="text" data-av="${i}" value="${esc(a.value ?? '')}">`;
@@ -270,8 +247,6 @@ async function ruleSheet(r, done) {
   on(el, 'click', '[data-rc]', (e, b) => { conds.splice(Number(b.dataset.rc), 1); drawC(); });
   on(el, 'click', '[data-adda]', () => { acts.push({ type: 'notify' }); drawA(); });
   on(el, 'click', '[data-ra]', (e, b) => { acts.splice(Number(b.dataset.ra), 1); drawA(); });
-  on(el, 'click', '[data-dev]', (e, b) => { const [i, id] = b.dataset.dev.split(':').map(Number); const s = new Set(acts[i].device_ids || []); s.has(id) ? s.delete(id) : s.add(id); acts[i].device_ids = [...s]; b.classList.toggle('on'); });
-  on(el, 'click', '[data-usr]', (e, b) => { const [i, id] = b.dataset.usr.split(':').map(Number); const s2 = new Set(acts[i].user_ids || []); s2.has(id) ? s2.delete(id) : s2.add(id); acts[i].user_ids = [...s2]; b.classList.toggle('on'); });
   on(el, 'click', '[data-ha]', (e, b) => { const [i, ...rest] = b.dataset.ha.split(':'); const svc = rest.join(':'); const s = new Set(acts[i].ha_services || []); s.has(svc) ? s.delete(svc) : s.add(svc); acts[i].ha_services = [...s]; b.classList.toggle('on'); });
   on(el, 'click', '[data-preview]', async () => { const p = await api('/rules/preview', { method: 'POST', body: { conditions: conds, match_all: el.querySelector('[name=match_all]').value === '1' } }); el.querySelector('#prev').innerHTML = `Matches ${p.count} existing transactions${p.sample.length ? `, e.g. ${p.sample.slice(0, 4).map((t) => `${esc(t.merchant)} ${fmt(t.amount)}`).join(', ')}` : ''}.`; });
   el.querySelector('[data-del]')?.addEventListener('click', async () => { await api(`/rules/${r.id}`, { method: 'DELETE' }); close(); done(); });

@@ -1,4 +1,4 @@
-import { state, api, token, setToken, fingerprint, loadRefs, icons, esc, sheet, toast, fail, fmt, niceDate, cat, $, on } from './core.js';
+import { state, api, token, setToken, loadRefs, icons, esc, sheet, toast, fail, fmt, niceDate, cat, $, on } from './core.js';
 import { renderHome, renderInbox } from './home.js';
 import { renderMoney, txSheet } from './money.js';
 import { renderPlan } from './plan.js';
@@ -53,13 +53,17 @@ export async function route() {
   const [path, query] = location.hash.replace(/^#\/?/, '').split('?');
   const parts = path.split('/');
   if (parts[0] === 'jot') { location.hash = '#/'; return jotSheet(); }
+  document.querySelectorAll('.scrim').forEach((x) => x.remove()); // close any open sheet when moving to another screen
   const r = ROUTES[parts[0]] || ROUTES[''];
   document.querySelectorAll('[data-r]').forEach((a) => a.classList.toggle('on', a.dataset.r === parts[0] || (r[2] === 'more' && a.dataset.r === 'more' && !document.querySelector(`.tabs [data-r="${parts[0]}"]`))));
   const view = $('#view');
   document.title = `${r[0]} · Hearth`;
   view.innerHTML = `<div class="topbar">${r[2] === 'more' && parts[0] !== 'more' ? `<button class="back" onclick="history.back()" aria-label="Back">‹</button>` : ''}<h1>${esc(r[0])}</h1>
+    <button class="bell" data-bell aria-label="Notifications">${icons.bell}<span class="badge hidden" data-unread></span></button>
     <button class="avatar" style="background:${state.me.user.color}" title="${esc(state.me.user.name)}" data-me>${esc(state.me.user.name[0])}</button></div><div id="body"></div>`;
   $('[data-me]', view).onclick = () => meSheet();
+  $('[data-bell]', view).onclick = () => notificationsSheet();
+  api('/notifications').then((n) => { const u = n.filter((x) => !x.read).length; const b = $('[data-unread]', view); if (b) { b.textContent = u; b.classList.toggle('hidden', !u); } }).catch(() => {});
   try { await r[1]($('#body', view), parts.slice(1), new URLSearchParams(query || '')); } catch (e) { $('#body', view).innerHTML = `<div class="empty"><b>Couldn't load this screen</b>${esc(e.message)}</div>`; }
   view.focus({ preventScroll: true });
 }
@@ -135,14 +139,22 @@ function shrink(file, max) {
   });
 }
 
+// Everything Hearth has told you, in one place (the same messages also go to your phones via Home Assistant)
+async function notificationsSheet() {
+  const list = await api('/notifications');
+  const { el } = sheet(`<h2>Notifications</h2>${list.length ? `<ul class="list">${list.map((n) => `<li class="tap" data-go="${esc(n.url || '')}" style="${n.read ? 'opacity:.65' : ''}"><div class="main"><div class="title">${esc(n.title)}</div><div class="meta" style="white-space:normal">${esc(n.body)}</div></div><span class="muted small">${niceDate(n.created_at)}</span></li>`).join('')}</ul>`
+    : '<p class="muted">Nothing yet. Budget alerts, new subscriptions, price drops and your morning summary will appear here.</p>'}`);
+  on(el, 'click', '[data-go]', (e, li) => { const u = li.dataset.go; const h = u.includes('#') ? u.slice(u.indexOf('#')) : '#/'; location.hash = h; });
+  api('/notifications/read', { method: 'POST' }).then(() => document.querySelectorAll('[data-unread]').forEach((b) => b.classList.add('hidden'))).catch(() => {});
+}
+
 function meSheet() {
-  const { el, close } = sheet(`<h2>${esc(state.me.user.name)}</h2><p class="muted">${esc(state.me.user.email)} · ${esc(state.me.household.name)}<br>This device: ${esc(state.me.device?.name || 'Unknown')}</p>
-    <div class="row"><button class="btn soft" data-a="push">${icons.bell.replace('<svg', '<svg width="18"')} Notifications on this device</button>
+  const { el, close } = sheet(`<h2>${esc(state.me.user.name)}</h2><p class="muted">${esc(state.me.user.email)} · ${esc(state.me.household.name)}</p>
+    <div class="row">
     <button class="btn soft" data-a="theme">Light / dark</button><a class="btn soft" href="#/settings" data-close>Settings</a></div>
     <div class="row end" style="margin-top:18px"><button class="btn ghost" data-a="out">Sign out</button></div>`);
   on(el, 'click', '[data-a]', async (e, b) => {
     if (b.dataset.a === 'out') { await api('/logout', { method: 'POST' }).catch(() => {}); setToken(null); location.reload(); }
-    if (b.dataset.a === 'push') { await enablePush(); close(); }
     if (b.dataset.a === 'theme') {
       const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
       const next = cur === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = next; try { localStorage.setItem('hl_theme', next); } catch {}
@@ -150,28 +162,12 @@ function meSheet() {
   });
 }
 
-export async function enablePush() {
-  try {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) throw new Error(/iPhone|iPad/.test(navigator.userAgent) ? 'On iPhone/iPad, first add Hearth to your Home Screen (Share → Add to Home Screen), open it from there, then try again.' : 'This browser does not support push notifications.');
-    if (location.protocol !== 'https:' && location.hostname !== 'localhost') throw new Error('Push notifications need Hearth to be served over HTTPS (see README).');
-    const perm = await Notification.requestPermission();
-    if (perm !== 'granted') throw new Error('Notifications were not allowed.');
-    const reg = await navigator.serviceWorker.ready;
-    const { key } = await api('/push/key');
-    const pad = '='.repeat((4 - (key.length % 4)) % 4);
-    const raw = Uint8Array.from(atob((key + pad).replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
-    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: raw });
-    await api('/push/subscribe', { method: 'POST', body: sub.toJSON() });
-    toast('Notifications are on for this device');
-  } catch (e) { fail(e); }
-}
-
 // ---------- auth ----------
 async function authScreen() {
   const { needsSetup, ha_user } = await api('/status');
   // Opened from the Home Assistant sidebar: sign in automatically if this HA user is already linked
   if (ha_user) {
-    const r = await api('/ingress-session', { method: 'POST', body: { fingerprint: fingerprint() } }).catch(() => ({}));
+    const r = await api('/ingress-session', { method: 'POST', body: {} }).catch(() => ({}));
     if (r.token) { setToken(r.token); return boot(); }
   }
   app.innerHTML = `<div class="auth"><img src="icon.svg" width="56" height="56" alt="">
@@ -186,7 +182,7 @@ async function authScreen() {
   $('#af').onsubmit = async (e) => {
     e.preventDefault();
     try {
-      const body = { ...Object.fromEntries(new FormData(e.target)), fingerprint: fingerprint() };
+      const body = Object.fromEntries(new FormData(e.target));
       const { token: t } = await api(needsSetup ? '/setup' : '/login', { method: 'POST', body });
       setToken(t); boot();
     } catch (err) { fail(err); }

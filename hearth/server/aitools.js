@@ -137,6 +137,9 @@ const RUNNERS = {
 
 // ---- actions ----
 function propose(hid, userId, threadId, type, payload, summary) {
+  // don't stack up the same suggestion every time someone asks a similar question
+  const same = q.get(`SELECT * FROM ai_actions WHERE household_id=? AND type=? AND payload=? AND status='pending'`, hid, type, JSON.stringify(payload));
+  if (same) { if (threadId && same.thread_id !== threadId) q.run('UPDATE ai_actions SET thread_id=? WHERE id=?', threadId, same.id); return { id: same.id, type, summary: same.summary, payload, status: 'pending' }; }
   const id = Number(q.run('INSERT INTO ai_actions(household_id,user_id,thread_id,type,payload,summary) VALUES(?,?,?,?,?,?)', hid, userId, threadId, type, JSON.stringify(payload), summary).lastInsertRowid);
   return { id, type, summary, payload, status: 'pending' };
 }

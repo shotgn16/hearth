@@ -238,7 +238,7 @@ function inbox(hid) {
   const notes = q.all(`SELECT * FROM notes WHERE household_id=? AND status='needs_review'`, hid);
   for (const n of notes) items.push({ type: 'note', id: `note-${n.id}`, note: { ...n, parsed: JSON.parse(n.parsed || '{}') }, title: `Check this note`, body: n.text });
   const budgets = q.all('SELECT * FROM budgets WHERE household_id=?', hid).map((b) => budgetStatus(hid, b)).filter((b) => b.pct >= b.alert_pct && (!b.end_date || b.end_date >= iso(new Date())));
-  for (const b of budgets) items.push({ type: 'budget', id: `budget-${b.id}`, budget: b, title: `${b.name}: ${b.pct}% used`, body: `£${b.remaining.toFixed(0)} left, ${b.days_left} days to go` });
+  for (const b of budgets) items.push({ type: 'budget', id: `budget-${b.id}`, budget: b, title: `${b.name}: ${b.pct}% used`, body: `${b.remaining >= 0 ? `£${b.remaining.toFixed(0)} left` : `£${(-b.remaining).toFixed(0)} over`}, ${b.days_left ? `${b.days_left} days to go` : 'last day of the period'}` });
   const soon = q.all(`SELECT * FROM events WHERE household_id=? AND start BETWEEN ? AND ? AND budget IS NULL AND estimated_cost IS NULL`, hid, iso(new Date()), iso(addDays(new Date(), 14)));
   for (const e of soon.slice(0, 5)) items.push({ type: 'event', id: `event-${e.id}`, event: e, title: `Will "${e.title}" cost anything?`, body: `${e.start.slice(0, 10)} — set a budget or dismiss`, soft: true });
   const aiFiled = q.get(`SELECT COUNT(*) n FROM transactions WHERE household_id=? AND categorised_by='ai'`, hid).n;

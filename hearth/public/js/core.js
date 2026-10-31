@@ -3,9 +3,6 @@ export const state = { me: null, cats: [], people: [], accounts: [], users: [], 
 
 export function token() { try { return localStorage.getItem('hl_token'); } catch { return null; } }
 export function setToken(t) { try { t ? localStorage.setItem('hl_token', t) : localStorage.removeItem('hl_token'); } catch {} }
-export function fingerprint() {
-  try { let f = localStorage.getItem('hl_device'); if (!f) { f = crypto.randomUUID(); localStorage.setItem('hl_device', f); } return f; } catch { return 'no-storage'; }
-}
 
 export async function api(path, { method = 'GET', body, raw } = {}) {
   const r = await fetch(`api${path}`, { method, headers: { 'Content-Type': 'application/json', ...(token() ? { Authorization: `Bearer ${token()}` } : {}) }, body: body !== undefined ? JSON.stringify(body) : undefined });

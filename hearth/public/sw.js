@@ -1,4 +1,4 @@
-// Service worker: app shell works offline, last API responses are readable offline, and push notifications arrive.
+// Service worker (standalone installs only): the app shell works offline and the last API responses stay readable offline.
 const SHELL = 'hearth-shell-v2';
 const SHELL_FILES = ['./', 'styles.css', 'icon.svg', 'manifest.webmanifest', 'js/app.js', 'js/core.js', 'js/charts.js',
   'js/home.js', 'js/money.js', 'js/plan.js', 'js/insights.js', 'js/more.js', 'js/settings.js', 'js/ask.js'];
@@ -19,13 +19,4 @@ self.addEventListener('fetch', (e) => {
     return;
   }
   e.respondWith(fetch(e.request).then((r) => { const c = r.clone(); caches.open(SHELL).then((ca) => ca.put(e.request, c)); return r; }).catch(() => caches.match(e.request).then((r) => r || caches.match(new URL('./', self.registration.scope).href))));
-});
-
-self.addEventListener('push', (e) => {
-  let d = {}; try { d = e.data.json(); } catch { d = { title: 'Hearth', body: e.data?.text() }; }
-  e.waitUntil(self.registration.showNotification(d.title || 'Hearth', { body: d.body, icon: 'icon-192.png', badge: 'icon-192.png', data: { url: new URL(d.url || './', self.registration.scope).href } }));
-});
-self.addEventListener('notificationclick', (e) => {
-  e.notification.close();
-  e.waitUntil(self.clients.matchAll({ type: 'window' }).then((cs) => { const c = cs[0]; if (c) { c.navigate(e.notification.data.url); return c.focus(); } return self.clients.openWindow(e.notification.data.url); }));
 });

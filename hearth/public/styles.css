@@ -270,3 +270,8 @@ details.adv summary { cursor: pointer; color: var(--ink-2); padding: 6px 0; }
 .review p:first-of-type { font-weight: 700; font-size: 1.08rem; }
 
 main:focus, main:focus-visible { outline: none; }
+
+.bell { position: relative; border: 0; background: none; color: var(--ink-2); width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
+.bell svg { width: 22px; height: 22px; }
+.bell:hover { background: var(--paper); }
+.bell .badge { top: 2px; right: 0; }

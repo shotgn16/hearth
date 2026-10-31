@@ -14,7 +14,7 @@ const ai = require('./ai');
 const notes = require('./notes');
 const cal = require('./calendar');
 const prices = require('./prices');
-const { notify, vapid } = require('./notify');
+const { notify } = require('./notify');
 const scheduler = require('./scheduler');
 
 const app = express();
@@ -57,36 +57,33 @@ api.post('/ingress-session', wrap(async (req, res) => {
     }
   }
   if (!u) return res.json({ ok: false, link: true, ha_user: { name: ha.name } });
-  const dev = auth.registerDevice(u.id, req.body.fingerprint || 'ha-ingress', req.headers['user-agent']);
-  res.json({ ok: true, token: auth.createSession(u.id, dev) });
+  res.json({ ok: true, token: auth.createSession(u.id) });
 }));
 
 api.post('/setup', wrap(async (req, res) => {
   if (q.get('SELECT 1 FROM users LIMIT 1')) throw err('Already set up', 403);
-  const { household, name, email, password, fingerprint } = req.body;
+  const { household, name, email, password } = req.body;
   if (!name || !email || !password || password.length < 8) throw err('Name, email and a password of 8+ characters are required');
   const hid = Number(q.run('INSERT INTO households(name) VALUES(?)', household || `${name}'s household`).lastInsertRowid);
   const uid = Number(q.run('INSERT INTO users(household_id,name,email,pass_hash,role,ha_user_id) VALUES(?,?,?,?,?,?)', hid, name, email.toLowerCase(), auth.hashPassword(password), 'admin', haIdentity(req)?.id || null).lastInsertRowid);
   q.run('INSERT INTO people(household_id,name,user_id,color) VALUES(?,?,?,?)', hid, name, uid, '#3b82f6');
   seedCategories(hid);
   q.run('INSERT INTO accounts(household_id,owner_user_id,name,type) VALUES(?,?,?,?)', hid, uid, 'Cash', 'cash');
-  const dev = auth.registerDevice(uid, fingerprint || 'unknown', req.headers['user-agent']);
-  res.json({ token: auth.createSession(uid, dev) });
+  res.json({ token: auth.createSession(uid) });
 }));
 
 api.post('/login', wrap(async (req, res) => {
-  const { email, password, fingerprint } = req.body;
+  const { email, password } = req.body;
   const u = q.get('SELECT * FROM users WHERE email=?', String(email || '').toLowerCase());
   if (!u || !auth.verifyPassword(password || '', u.pass_hash)) throw err('Email or password is wrong', 401);
   const ha = haIdentity(req);
   if (ha && !u.ha_user_id && !q.get('SELECT 1 FROM users WHERE ha_user_id=?', ha.id)) q.run('UPDATE users SET ha_user_id=? WHERE id=?', ha.id, u.id);
-  const dev = auth.registerDevice(u.id, fingerprint || 'unknown', req.headers['user-agent']);
-  res.json({ token: auth.createSession(u.id, dev) });
+  res.json({ token: auth.createSession(u.id) });
 }));
 
 api.use(auth.authMiddleware);
-api.post('/logout', (req, res) => { q.run('DELETE FROM sessions WHERE user_id=? AND device_id IS ?', req.user.id, req.user.device_id); res.json({ ok: true }); });
-api.get('/me', (req, res) => res.json({ user: req.user, household: q.get('SELECT * FROM households WHERE id=?', req.hid), device: q.get('SELECT * FROM devices WHERE id=?', req.user.device_id),
+api.post('/logout', (req, res) => { q.run('DELETE FROM sessions WHERE token=?', req.user.token); res.json({ ok: true }); });
+api.get('/me', (req, res) => res.json({ user: (({ token, ...u }) => u)(req.user), household: q.get('SELECT * FROM households WHERE id=?', req.hid),
   addon: config.isAddon, ha: require('./ha').available(req.hid), ha_linked: !!q.get('SELECT ha_user_id FROM users WHERE id=?', req.user.id)?.ha_user_id,
   ai: (() => { const c = ai.cfg(req.hid); return { enabled: c.enabled, vision: !!c.visionModel, features: c.features }; })() }));
 
@@ -121,7 +118,7 @@ crud('calendars', ['user_id', 'name', 'provider', 'url', 'credentials', 'color',
 crud('watches', ['user_id', 'query', 'url', 'target_price', 'provider', 'enabled'], { after: async (req, row) => { if (row?.url) prices.checkWatch(row).catch(() => {}); } });
 crud('saved_views', ['user_id', 'name', 'kind', 'config', 'pinned'], { json: ['config'] });
 
-// ---------------- users & devices ----------------
+// ---------------- users ----------------
 api.get('/users', (req, res) => res.json(q.all('SELECT id,name,email,role,color,created_at FROM users WHERE household_id=?', req.hid)));
 api.post('/users', wrap(async (req, res) => {
   if (req.user.role !== 'admin') throw err('Only an admin can add people', 403);
@@ -145,19 +142,6 @@ api.delete('/users/:id', wrap(async (req, res) => {
   q.run('DELETE FROM users WHERE id=? AND household_id=?', req.params.id, req.hid); res.json({ ok: true });
 }));
 
-api.get('/devices', (req, res) => res.json(q.all(`SELECT d.id,d.user_id,u.name user_name,d.name,d.platform,d.browser,d.notify_enabled,d.first_seen,d.last_seen,
-  d.push_subscription IS NOT NULL can_push, d.id=? is_current FROM devices d JOIN users u ON u.id=d.user_id WHERE u.household_id=? ORDER BY d.last_seen DESC`, req.user.device_id, req.hid)));
-api.patch('/devices/:id', (req, res) => {
-  const d = q.get('SELECT d.* FROM devices d JOIN users u ON u.id=d.user_id WHERE d.id=? AND u.household_id=?', req.params.id, req.hid);
-  if (!d) return res.status(404).json({ error: 'Not found' });
-  if (req.body.name !== undefined) q.run('UPDATE devices SET name=? WHERE id=?', req.body.name, d.id);
-  if (req.body.notify_enabled !== undefined) q.run('UPDATE devices SET notify_enabled=? WHERE id=?', req.body.notify_enabled ? 1 : 0, d.id);
-  res.json({ ok: true });
-});
-api.delete('/devices/:id', (req, res) => { q.run('DELETE FROM devices WHERE id=? AND user_id IN (SELECT id FROM users WHERE household_id=?)', req.params.id, req.hid); res.json({ ok: true }); });
-api.get('/push/key', (req, res) => res.json({ key: vapid().publicKey }));
-api.post('/push/subscribe', (req, res) => { q.run('UPDATE devices SET push_subscription=?, notify_enabled=1 WHERE id=?', JSON.stringify(req.body), req.user.device_id); res.json({ ok: true }); });
-api.post('/devices/:id/test', wrap(async (req, res) => { await notify(req.hid, { title: 'Hearth test', body: 'Notifications are working on this device 🎉' }, { deviceIds: [Number(req.params.id)], haServices: [], ntfy: false }); res.json({ ok: true }); }));
 
 // ---------------- transactions (the spreadsheet core) ----------------
 function txQuery(req, { forExport = false } = {}) {

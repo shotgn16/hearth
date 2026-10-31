@@ -1,5 +1,7 @@
 # Hearth
 
+Full documentation with screenshots: https://github.com/shotgn16/hearth/tree/main/docs
+
 Hearth takes the admin of money out of your head. Transactions arrive from your bank, get cleaned up, categorised and checked against your budgets on their own. You only hear about things that need a decision.
 
 Everything — transactions, budgets, calendar copies, AI conversations — lives in a single database inside this add-on's storage and is included in your Home Assistant backups. The only outside connections are the ones you switch on: your bank feed, product pages for price watching (they only see the product link), and your own Ollama server.
@@ -97,7 +99,7 @@ Elsewhere: **Estimate with AI** on any calendar event, **Ask AI what to cut** on
 
 ## Using it outside Home Assistant
 
-The sidebar panel works in the HA app on every phone. If you'd also like Hearth as its own installed app (home-screen icon, its own push notifications), set a host port for `8484/tcp` on the add-on's **Network** section and put it behind HTTPS (Nginx Proxy Manager or the NGINX add-on). Sign in with your Hearth email and password there.
+The sidebar panel works in the HA app on every phone. If you'd also like Hearth as its own installed app (its own home-screen icon outside the HA app), set a host port for `8484/tcp` on the add-on's **Network** section and put it behind HTTPS (Nginx Proxy Manager or the NGINX add-on). Sign in with your Hearth email and password there.
 
 ## Backups
 

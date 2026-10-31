@@ -241,14 +241,15 @@ async function nlRule(hid, text) {
   const cats = q.all('SELECT id, name FROM categories WHERE household_id=?', hid);
   const people = q.all('SELECT id, name FROM people WHERE household_id=?', hid);
   const users = q.all('SELECT id, name FROM users WHERE household_id=?', hid);
+  let services = []; try { services = await require('./ha').notifyServices(hid); } catch { /* HA not connected */ }
   const r = await askJSON(hid, `Convert this request into a workflow rule for a finance app. Reply JSON:
 {"name": short name, "trigger": one of transaction_created|large_transaction|budget_threshold|subscription_detected|subscription_due|event_upcoming|price_target,
  "match_all": true|false, "conditions": [{"field": merchant|description|abs_amount|direction|category_id|account_id|person_id|user_id|kind|weekday|day_of_month|pct|price|days_until,
  "op": contains|not_contains|equals|not_equals|starts_with|regex|gt|gte|lt|lte|between|in, "value": string}],
- "actions": [{"type": set_category|add_tag|set_person|set_kind|set_color|set_merchant|append_note|notify, "value": string (ids for category/person), "title": for notify, "message": for notify, "notify_users": [user names] }]}
-Categories: ${cats.map((c) => `${c.id}=${c.name}`).join(', ')}. People: ${people.map((p) => `${p.id}=${p.name}`).join(', ')}. Users: ${users.map((u) => u.name).join(', ')}.
+ "actions": [{"type": set_category|add_tag|set_person|set_kind|set_color|set_merchant|append_note|notify, "value": string (ids for category/person), "title": for notify, "message": for notify, "ha_services": [notify services to send to, from the list] }]}
+Categories: ${cats.map((c) => `${c.id}=${c.name}`).join(', ')}. People: ${people.map((p) => `${p.id}=${p.name}`).join(', ')}. Users: ${users.map((u) => u.name).join(', ')}. Home Assistant notify services (phones are mobile_app_<name>): ${services.join(', ') || 'none'}.
 In notify messages you can use {amount}, {merchant}, {name}, {pct}. direction is "out" for spending. Request: "${text}"`, { task: 'workflow' });
-  for (const a of r.actions || []) if (a.type === 'notify' && a.notify_users?.length) a.user_ids = users.filter((u) => a.notify_users.some((n) => n.toLowerCase() === u.name.toLowerCase())).map((u) => u.id);
+  for (const a of r.actions || []) if (a.type === 'notify') a.ha_services = (a.ha_services || []).filter((s) => services.includes(s));
   return { name: r.name || 'New workflow', trigger: r.trigger || 'transaction_created', match_all: r.match_all === false ? 0 : 1, conditions: JSON.stringify(r.conditions || []), actions: JSON.stringify(r.actions || []), priority: 100, stop_processing: 0 };
 }
 

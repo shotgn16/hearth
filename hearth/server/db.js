@@ -17,12 +17,6 @@ CREATE TABLE IF NOT EXISTS users (
   role TEXT DEFAULT 'member', color TEXT DEFAULT '#3b82f6', created_at TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
   device_id INTEGER, expires_at TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS devices (
-  id INTEGER PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  fingerprint TEXT NOT NULL, name TEXT, platform TEXT, browser TEXT, user_agent TEXT,
-  push_subscription TEXT, notify_enabled INTEGER DEFAULT 1,
-  first_seen TEXT DEFAULT CURRENT_TIMESTAMP, last_seen TEXT DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(user_id, fingerprint));
 CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY, household_id INTEGER REFERENCES households(id) ON DELETE CASCADE,
   name TEXT NOT NULL, color TEXT DEFAULT '#8b5cf6', user_id INTEGER);
 CREATE TABLE IF NOT EXISTS accounts (

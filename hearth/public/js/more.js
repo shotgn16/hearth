@@ -7,7 +7,7 @@ export async function renderMore(el) {
   const items = [['inbox', 'Needs attention', icons.inbox, 'Quick decisions Hearth needs from you'], ['calendar', 'Events & costs', icons.calendar, 'Your calendars, with budgets and real costs'],
     ['subscriptions', 'Regular payments', icons.repeat, 'Subscriptions and bills, found automatically'], ['watch', 'Price watch', icons.watch, 'Things you want, and when to buy them'],
     ['ask', 'Ask Hearth', icons.ai, 'Budget and buying advice from your local AI'], ['notes', 'Notes', icons.note, 'Everything you have jotted'], ['insights', 'Insights', icons.insights, 'Trends, forecasts and reports'],
-    ['settings', 'Settings', icons.settings, 'Banks, people, devices, workflows, integrations']];
+    ['settings', 'Settings', icons.settings, 'Banks, people, workflows, integrations, local AI']];
   el.innerHTML = `<div class="surface"><ul class="list">${items.map(([r, l, i, d]) => `<li class="tap" onclick="location.hash='#/${r}'"><span class="ico" style="background:var(--paper-2)">${i.replace('<svg', '<svg width="20"')}</span><div class="main"><div class="title">${l}</div><div class="meta">${d}</div></div><span class="muted">›</span></li>`).join('')}</ul></div>`;
 }
 
