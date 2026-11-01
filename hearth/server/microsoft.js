@@ -62,7 +62,7 @@ async function poll(acct, deviceCode, interval) {
 
 function store(id, j) {
   tokens.set(id, { token: j.access_token, expires: Date.now() + ((Number(j.expires_in) || 3600) - 120) * 1000 });
-  if (j.refresh_token) q.run('UPDATE email_accounts SET graph_refresh_token=? WHERE id=?', j.refresh_token, id);
+  if (j.refresh_token) q.run('UPDATE email_accounts SET graph_refresh_token=? WHERE id=?', require('./secrets').encrypt(j.refresh_token), id);
 }
 
 async function accessToken(id) {
@@ -70,7 +70,7 @@ async function accessToken(id) {
   if (t && t.expires > Date.now()) return t.token;
   const a = q.get('SELECT * FROM email_accounts WHERE id=?', id);
   if (!a?.graph_refresh_token) throw new Error('Not signed in to Microsoft yet — press Sign in with Microsoft');
-  const { ok, j } = await post(`${authority(a)}/token`, { grant_type: 'refresh_token', client_id: a.graph_client_id.trim(), refresh_token: a.graph_refresh_token, scope: SCOPES });
+  const { ok, j } = await post(`${authority(a)}/token`, { grant_type: 'refresh_token', client_id: a.graph_client_id.trim(), refresh_token: require('./secrets').decrypt(a.graph_refresh_token), scope: SCOPES });
   if (!ok) throw new Error(`Microsoft sign-in has expired — sign in again (${errText(j)})`);
   store(id, j);
   return tokens.get(id).token;

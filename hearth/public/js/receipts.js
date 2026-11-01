@@ -10,7 +10,7 @@ const ACTION = {
   add_spend: () => 'Add it as a new spend',
   none: () => 'Just keep the receipt',
 };
-const fileUrl = (r, a) => `api/email/receipts/${r.id}/file/${encodeURIComponent(a.name)}?t=${token()}`;
+const fileUrl = (r, a) => `api/email/receipts/${r.id}/file/${encodeURIComponent(a.name)}`;
 const confLabel = (c) => (c >= 0.8 ? ['High', 'ok'] : c >= 0.5 ? ['Medium', 'due'] : ['Low', '']);
 
 export async function renderReceipts(el, parts = []) {
@@ -71,7 +71,7 @@ function card(r) {
       <div style="flex:1;min-width:0"><div class="title" style="font-weight:700;font-size:1.05rem">${esc(r.merchant || r.from_name)}${r.total != null ? ` · ${fmt(r.total)}` : ''}</div>
         <div class="muted small" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.subject)} · ${relDay(r.received_at)}${r.mailbox ? ` · ${esc(r.mailbox)}` : ''}</div>
         <div class="muted small">${r.order_ref ? `Ref ${esc(r.order_ref)} · ` : ''}${r.account_ref ? `Account ${esc(r.account_ref)} · ` : ''}${r.items.length ? `${r.items.length} item${r.items.length > 1 ? 's' : ''}` : ''}
-          ${r.attachments.map((a) => ` · <a href="${fileUrl(r, a)}" target="_blank" rel="noopener">${esc(a.name)}</a>`).join('')}</div></div>
+          ${r.attachments.map((a) => ` · <a href="#" data-file="${fileUrl(r, a)}">${esc(a.name)}</a>`).join('')}</div></div>
       ${r.status === 'pending' ? `<span class="pill ${cc}" title="How sure Hearth is">${cl} match</span>` : ''}
     </div>
     <div class="match">
@@ -143,6 +143,6 @@ async function viewEmail(id) {
   const r = await api(`/email/receipts/${id}`);
   sheet(`<h2>${esc(r.subject)}</h2><p class="muted small" style="margin-top:-8px">From ${esc(r.from_name)} &lt;${esc(r.from_email)}&gt; · ${new Date(r.received_at).toLocaleString('en-GB')}</p>
     ${r.items.length ? `<table class="grid" style="margin-bottom:12px"><tbody>${r.items.map((i) => `<tr><td>${i.qty > 1 ? `${i.qty} × ` : ''}${esc(i.name)}</td><td class="r">${fmt(i.price)}</td></tr>`).join('')}</tbody></table>` : ''}
-    ${r.attachments.map((a) => `<a class="btn soft small" style="margin:0 6px 10px 0" href="${fileUrl(r, a)}" target="_blank" rel="noopener">Open ${esc(a.name)}</a>`).join('')}
+    ${r.attachments.map((a) => `<a class="btn soft small" style="margin:0 6px 10px 0" href="#" data-file="${fileUrl(r, a)}">Open ${esc(a.name)}</a>`).join('')}
     <pre class="email-text">${esc(r.body_text || '')}</pre><div class="row end"><button class="btn" data-close>Close</button></div>`, { wide: true });
 }

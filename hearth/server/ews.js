@@ -11,7 +11,7 @@ const envelope = (body) => `<?xml version="1.0" encoding="utf-8"?>
 function ntlmPost(acct, xml) {
   const httpntlm = require('httpntlm');
   return new Promise((resolve, reject) => {
-    httpntlm.post({ url: acct.ews_url, username: acct.username, password: acct.password, domain: acct.ews_domain || '', workstation: '',
+    httpntlm.post({ url: acct.ews_url, username: acct.username, password: require('./secrets').decrypt(acct.password), domain: acct.ews_domain || '', workstation: '',
       headers: { 'Content-Type': 'text/xml; charset=utf-8' }, body: xml, rejectUnauthorized: !acct.allow_self_signed, timeout: 60000 },
     (err, res) => (err ? reject(err) : resolve({ status: res.statusCode, text: res.body })));
   });
@@ -19,7 +19,7 @@ function ntlmPost(acct, xml) {
 
 async function basicPost(acct, xml) {
   const user = acct.ews_domain ? `${acct.ews_domain}\\${acct.username}` : acct.username;
-  const r = await fetch(acct.ews_url, { method: 'POST', headers: { 'Content-Type': 'text/xml; charset=utf-8', Authorization: `Basic ${Buffer.from(`${user}:${acct.password}`).toString('base64')}` }, body: xml, signal: AbortSignal.timeout(60000) });
+  const r = await fetch(acct.ews_url, { method: 'POST', headers: { 'Content-Type': 'text/xml; charset=utf-8', Authorization: `Basic ${Buffer.from(`${user}:${require('./secrets').decrypt(acct.password)}`).toString('base64')}` }, body: xml, signal: AbortSignal.timeout(60000) });
   return { status: r.status, text: await r.text() };
 }
 

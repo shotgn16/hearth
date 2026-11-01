@@ -16,8 +16,24 @@ const cal = require('./calendar');
 const prices = require('./prices');
 const { notify } = require('./notify');
 const scheduler = require('./scheduler');
+const secrets = require('./secrets');
+const { encrypt, decrypt } = secrets;
+const MASK = '••••••';
 
 const app = express();
+app.disable('x-powered-by');
+// Browser-side lock-down: only Hearth's own code runs, nothing loads from elsewhere, no framing by other sites
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(), payment=(), usb=()');
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; " +
+    "connect-src 'self'; font-src 'self' data:; object-src 'none'; frame-src 'self' blob:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'");
+  if (req.secure || req.headers['x-forwarded-proto'] === 'https') res.setHeader('Strict-Transport-Security', 'max-age=31536000');
+  if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
+  next();
+});
 app.use(express.json({ limit: '60mb' }));
 app.use(express.text({ limit: '60mb', type: ['text/*', 'application/x-ofx'] }));
 
@@ -39,7 +55,7 @@ function haIdentity(req) {
 // ---------------- public: first-run setup + login ----------------
 api.get('/status', (req, res) => {
   const ha = haIdentity(req);
-  res.json({ needsSetup: !q.get('SELECT 1 FROM users LIMIT 1'), version: process.env.HEARTH_VERSION || '1.4.0', addon: config.isAddon, ha_user: ha ? { name: ha.name } : null });
+  res.json({ needsSetup: !q.get('SELECT 1 FROM users LIMIT 1'), version: process.env.HEARTH_VERSION || '1.5.0', addon: config.isAddon, ha_user: ha ? { name: ha.name } : null });
 });
 
 // Opening Hearth from the HA sidebar signs you in as your HA user once linked
@@ -72,38 +88,49 @@ api.post('/setup', wrap(async (req, res) => {
   res.json({ token: auth.createSession(uid) });
 }));
 
+// Slow down password guessing: 8 wrong attempts per email or 20 per address in 15 minutes, then a 15-minute pause
+const failures = new Map();
+const tooMany = (k, max) => { const f = failures.get(k); return f && f.n >= max && Date.now() - f.t < 15 * 60000; };
+const failed = (k) => { const f = failures.get(k); failures.set(k, f && Date.now() - f.t < 15 * 60000 ? { n: f.n + 1, t: f.t } : { n: 1, t: Date.now() }); };
 api.post('/login', wrap(async (req, res) => {
   const { email, password } = req.body;
+  const ek = `e:${String(email || '').toLowerCase()}`, ik = `i:${req.socket.remoteAddress}`;
+  if (tooMany(ek, 8) || tooMany(ik, 20)) throw err('Too many wrong passwords — wait 15 minutes and try again', 429);
   const u = q.get('SELECT * FROM users WHERE email=?', String(email || '').toLowerCase());
-  if (!u || !auth.verifyPassword(password || '', u.pass_hash)) throw err('Email or password is wrong', 401);
+  if (!u || !auth.verifyPassword(password || '', u.pass_hash)) { failed(ek); failed(ik); throw err('Email or password is wrong', 401); }
+  failures.delete(ek);
   const ha = haIdentity(req);
   if (ha && !u.ha_user_id && !q.get('SELECT 1 FROM users WHERE ha_user_id=?', ha.id)) q.run('UPDATE users SET ha_user_id=? WHERE id=?', ha.id, u.id);
   res.json({ token: auth.createSession(u.id) });
 }));
 
 api.use(auth.authMiddleware);
-api.post('/logout', (req, res) => { q.run('DELETE FROM sessions WHERE token=?', req.user.token); res.json({ ok: true }); });
+api.post('/logout', (req, res) => { auth.endSession(req.user.token); res.json({ ok: true }); });
+api.get('/security', (req, res) => res.json({ encryption: 'AES-256-GCM', key_file: process.env.HEARTH_SECRET_KEY ? 'environment variable' : 'hearth.key in the data folder',
+  sessions: auth.sessionCount(req.user.id), session_days: 30, https: req.secure || req.headers['x-forwarded-proto'] === 'https' || !!req.headers['x-ingress-path'] }));
+api.post('/security/sign-out-others', (req, res) => res.json({ ended: auth.endOtherSessions(req.user.id, req.user.token) }));
 api.get('/me', (req, res) => res.json({ user: (({ token, ...u }) => u)(req.user), household: q.get('SELECT * FROM households WHERE id=?', req.hid),
   addon: config.isAddon, ha: require('./ha').available(req.hid), ha_linked: !!q.get('SELECT ha_user_id FROM users WHERE id=?', req.user.id)?.ha_user_id,
   ai: (() => { const c = ai.cfg(req.hid); return { enabled: c.enabled, vision: !!c.visionModel, features: c.features }; })() }));
 
 // ---------------- generic CRUD for simple household-scoped tables ----------------
-function crud(table, fields, { json = [], order = 'id', after } = {}) {
-  const enc = (k, v) => (json.includes(k) && typeof v !== 'string' ? JSON.stringify(v ?? []) : v === '' ? null : v);
-  api.get(`/${table}`, (req, res) => res.json(q.all(`SELECT * FROM ${table} WHERE household_id=? ORDER BY ${order}`, req.hid)));
+function crud(table, fields, { json = [], order = 'id', after, secret = [] } = {}) {
+  const enc = (k, v) => (secret.includes(k) ? (v ? encrypt(typeof v === 'string' ? v : JSON.stringify(v)) : null) : json.includes(k) && typeof v !== 'string' ? JSON.stringify(v ?? []) : v === '' ? null : v);
+  const hide = (row) => (row ? Object.fromEntries(Object.entries(row).map(([k, v]) => [k, secret.includes(k) && v ? MASK : v])) : row);
+  api.get(`/${table}`, (req, res) => res.json(q.all(`SELECT * FROM ${table} WHERE household_id=? ORDER BY ${order}`, req.hid).map(hide)));
   api.post(`/${table}`, wrap(async (req, res) => {
     const keys = fields.filter((f) => req.body[f] !== undefined);
     const r = q.run(`INSERT INTO ${table}(household_id${keys.map((k) => `,${k}`).join('')}) VALUES(?${keys.map(() => ',?').join('')})`, req.hid, ...keys.map((k) => enc(k, req.body[k])));
     const row = q.get(`SELECT * FROM ${table} WHERE id=?`, Number(r.lastInsertRowid));
     if (after) await after(req, row);
-    res.json(row);
+    res.json(hide(row));
   }));
   api.patch(`/${table}/:id`, wrap(async (req, res) => {
-    const keys = fields.filter((f) => req.body[f] !== undefined);
+    const keys = fields.filter((f) => req.body[f] !== undefined && !(secret.includes(f) && req.body[f] === MASK));
     if (keys.length) q.run(`UPDATE ${table} SET ${keys.map((k) => `${k}=?`).join(',')} WHERE id=? AND household_id=?`, ...keys.map((k) => enc(k, req.body[k])), req.params.id, req.hid);
     const row = q.get(`SELECT * FROM ${table} WHERE id=? AND household_id=?`, req.params.id, req.hid);
     if (after) await after(req, row);
-    res.json(row);
+    res.json(hide(row));
   }));
   api.delete(`/${table}/:id`, (req, res) => { q.run(`DELETE FROM ${table} WHERE id=? AND household_id=?`, req.params.id, req.hid); res.json({ ok: true }); });
 }
@@ -114,7 +141,7 @@ crud('tags', ['name', 'color'], { order: 'name' });
 crud('rules', ['name', 'enabled', 'priority', 'trigger', 'match_all', 'conditions', 'actions', 'stop_processing'], { json: ['conditions', 'actions'], order: 'priority, id' });
 crud('budgets', ['name', 'amount', 'period', 'start_date', 'end_date', 'category_ids', 'tag_ids', 'scope', 'user_id', 'person_id', 'event_id', 'alert_pct', 'rollover', 'color', 'flag'], { json: ['category_ids', 'tag_ids'] });
 crud('goals', ['name', 'kind', 'target_amount', 'current_amount', 'target_date', 'account_id', 'scope', 'user_id', 'color']);
-crud('calendars', ['user_id', 'name', 'provider', 'url', 'credentials', 'color', 'enabled'], { after: async (req, row) => { if (row?.url) cal.syncCalendar(row).catch(() => {}); } });
+crud('calendars', ['user_id', 'name', 'provider', 'url', 'credentials', 'color', 'enabled'], { secret: ['credentials'], after: async (req, row) => { if (row?.url) cal.syncCalendar(row).catch(() => {}); } });
 crud('watches', ['user_id', 'query', 'url', 'target_price', 'provider', 'enabled'], { after: async (req, row) => { if (row?.url) prices.checkWatch(row).catch(() => {}); } });
 crud('saved_views', ['user_id', 'name', 'kind', 'config', 'pinned'], { json: ['config'] });
 
@@ -133,7 +160,11 @@ api.patch('/users/:id', wrap(async (req, res) => {
   const { name, color, password, role } = req.body;
   if (name) q.run('UPDATE users SET name=? WHERE id=? AND household_id=?', name, req.params.id, req.hid);
   if (color) q.run('UPDATE users SET color=? WHERE id=? AND household_id=?', color, req.params.id, req.hid);
-  if (password) q.run('UPDATE users SET pass_hash=? WHERE id=? AND household_id=?', auth.hashPassword(password), req.params.id, req.hid);
+  if (password) {
+    if (String(password).length < 8) throw err('Password must be 8+ characters');
+    if (q.run('UPDATE users SET pass_hash=? WHERE id=? AND household_id=?', auth.hashPassword(password), req.params.id, req.hid).changes)
+      auth.endOtherSessions(Number(req.params.id), Number(req.params.id) === req.user.id ? req.user.token : null); // a new password signs out other devices
+  }
   if (role && req.user.role === 'admin') q.run('UPDATE users SET role=? WHERE id=? AND household_id=?', role, req.params.id, req.hid);
   res.json({ ok: true });
 }));
@@ -251,7 +282,7 @@ api.post('/connections', wrap(async (req, res) => {
   let config;
   if (provider === 'simplefin') config = { access_url: access_url || await banks.claimSimplefin(setup_token), history_from, owner_user_id };
   else config = { ...rest, history_from, owner_user_id };
-  const id = Number(q.run('INSERT INTO connections(household_id,provider,name,config) VALUES(?,?,?,?)', req.hid, provider, name || 'superFin', JSON.stringify(config)).lastInsertRowid);
+  const id = Number(q.run('INSERT INTO connections(household_id,provider,name,config) VALUES(?,?,?,?)', req.hid, provider, name || 'superFin', encrypt(JSON.stringify(config))).lastInsertRowid);
   // the token is already used up, so keep the connection even if the first import fails — "Sync now" retries it
   try {
     const result = await banks.syncConnection(q.get('SELECT * FROM connections WHERE id=?', id), { full: true });
@@ -320,7 +351,7 @@ const EMAIL_FIELDS = ['user_id', 'name', 'kind', 'host', 'port', 'secure', 'user
 const JSON_FIELDS = ['folders', 'folder_names'];
 const safeAcct = (a) => ({ ...a, password: a.password ? '••••••' : '', graph_refresh_token: undefined, signed_in: a.kind === 'microsoft' ? !!a.graph_refresh_token : undefined, state: undefined,
   folders: JSON.parse(a.folders || '["INBOX"]'), folder_names: JSON.parse(a.folder_names || '{}'), login: a.kind === 'microsoft' ? require('./microsoft').loginStatus(a.id) : undefined });
-const fieldVal = (k, v) => (JSON_FIELDS.includes(k) ? JSON.stringify(v) : typeof v === 'boolean' ? (v ? 1 : 0) : v);
+const fieldVal = (k, v) => (k === 'password' ? encrypt(v) : JSON_FIELDS.includes(k) ? JSON.stringify(v) : typeof v === 'boolean' ? (v ? 1 : 0) : v);
 api.get('/email/accounts', (req, res) => res.json(q.all('SELECT * FROM email_accounts WHERE household_id=? ORDER BY id', req.hid).map(safeAcct)));
 api.post('/email/accounts/test', wrap(async (req, res) => {
   let b = { secure: 1, port: 993, kind: 'imap', ...req.body };
@@ -386,7 +417,12 @@ api.post('/email/receipts/:id/rematch', (req, res) => { email.rematch(req.hid, N
 api.get('/email/receipts/:id/file/:name', (req, res) => {
   const a = email.attachmentPath(req.hid, Number(req.params.id), req.params.name);
   if (!a || !require('fs').existsSync(a.file)) return res.status(404).json({ error: 'Not found' });
-  res.setHeader('Content-Type', a.type); res.setHeader('Content-Disposition', `inline; filename="${a.name.replace(/"/g, '')}"`); res.sendFile(a.file);
+  // receipts are stored encrypted; only PDFs and pictures open in the browser, in a sandbox
+  const safe = /^(application\/pdf|image\/(png|jpe?g|gif|webp|heic))$/i.test(a.type);
+  res.setHeader('Content-Type', safe ? a.type : 'application/octet-stream');
+  res.setHeader('Content-Disposition', `${safe ? 'inline' : 'attachment'}; filename="${a.name.replace(/[^\w.\- ]/g, '_')}"`);
+  res.setHeader('Content-Security-Policy', 'sandbox; default-src \'none\'; img-src \'self\' data:; style-src \'unsafe-inline\'; plugin-types application/pdf');
+  res.send(secrets.readFileDecrypted(a.file));
 });
 api.get('/transactions/:id/receipts', (req, res) => res.json(q.all(`SELECT id, merchant, subject, total, receipt_date, order_ref, attachments, status FROM email_receipts WHERE household_id=? AND transaction_id=? AND status='approved'`, req.hid, req.params.id)
   .map((r) => ({ ...r, attachments: JSON.parse(r.attachments || '[]') }))));
@@ -574,15 +610,16 @@ api.put('/system', (req, res) => {
   setSetting(0, 'system', next); config.applySystem(next);
   res.json({ ok: true });
 });
+const SECRET_SETTINGS = ['homeassistant', 'ntfy']; // their .token is stored encrypted and never sent back
 api.get('/settings', (req, res) => {
   const out = {}; for (const k of SETTING_KEYS) out[k] = getSetting(req.hid, k);
-  if (out.homeassistant?.token) out.homeassistant = { ...out.homeassistant, token: '••••••' };
+  for (const k of SECRET_SETTINGS) if (out[k]?.token) out[k] = { ...out[k], token: MASK };
   res.json(out);
 });
 api.put('/settings', (req, res) => {
   for (const k of SETTING_KEYS) if (req.body[k] !== undefined) {
     let v = req.body[k];
-    if (k === 'homeassistant' && v?.token === '••••••') v = { ...v, token: getSetting(req.hid, 'homeassistant')?.token };
+    if (SECRET_SETTINGS.includes(k) && v && typeof v === 'object') v = { ...v, token: v.token === MASK ? getSetting(req.hid, k)?.token : encrypt(v.token || '') || '' };
     setSetting(req.hid, k, v);
   }
   if (req.body.household_name) q.run('UPDATE households SET name=? WHERE id=?', req.body.household_name, req.hid);
@@ -598,13 +635,26 @@ api.get('/homeassistant/status', wrap(async (req, res) => {
 api.get('/homeassistant/services', wrap(async (req, res) => res.json(await ha.notifyServices(req.hid))));
 api.get('/homeassistant/calendars', wrap(async (req, res) => res.json(await ha.calendars(req.hid))));
 api.post('/sync-all', wrap(async (req, res) => { await scheduler.tick(); res.json({ ok: true }); }));
-api.get('/backup', (req, res) => {
+const backupData = (hid) => {
   const tables = ['accounts', 'categories', 'transactions', 'tags', 'transaction_tags', 'people', 'rules', 'budgets', 'goals', 'events', 'notes', 'subscriptions', 'subscription_payments', 'email_receipts', 'watches', 'plan_cells', 'saved_views'];
   const out = { exported_at: new Date().toISOString() };
-  for (const t of tables) out[t] = t === 'transaction_tags' ? q.all('SELECT tt.* FROM transaction_tags tt JOIN transactions t ON t.id=tt.transaction_id WHERE t.household_id=?', req.hid) : q.all(`SELECT * FROM ${t} WHERE household_id=?`, req.hid);
-  res.setHeader('Content-Disposition', `attachment; filename="hearth-backup-${A.iso(new Date())}.json"`);
-  res.json(out);
-});
+  for (const t of tables) out[t] = t === 'transaction_tags' ? q.all('SELECT tt.* FROM transaction_tags tt JOIN transactions t ON t.id=tt.transaction_id WHERE t.household_id=?', hid) : q.all(`SELECT * FROM ${t} WHERE household_id=?`, hid);
+  return out;
+};
+// Backups are protected with a passphrase you choose (AES-256-GCM, key stretched with scrypt)
+api.post('/backup', wrap(async (req, res) => {
+  const pass = String(req.body.passphrase || '');
+  const day = A.iso(new Date());
+  if (!pass) { if (!req.body.unencrypted) throw err('Choose a passphrase to protect the backup'); res.setHeader('Content-Disposition', `attachment; filename="hearth-backup-${day}.json"`); return res.json(backupData(req.hid)); }
+  if (pass.length < 8) throw err('Use a passphrase of at least 8 characters');
+  res.setHeader('Content-Disposition', `attachment; filename="hearth-backup-${day}.hearth"`);
+  res.type('application/json').send(secrets.encryptWithPassphrase(JSON.stringify(backupData(req.hid)), pass));
+}));
+// Open an encrypted backup (to check it, or read it back out)
+api.post('/backup/decrypt', wrap(async (req, res) => {
+  const { file, passphrase } = req.body;
+  res.type('application/json').send(secrets.decryptWithPassphrase(file, String(passphrase || '')));
+}));
 
 app.use('/api', api);
 app.use('/api', (req, res) => res.status(404).json({ error: `No such endpoint: ${req.method} ${req.originalUrl}` }));
@@ -627,11 +677,33 @@ app.get(['/', '/index.html'], sendIndex);
 app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: 0, index: false }));
 app.get(/^\/(?!api).*/, sendIndex);
 
+// Encrypt anything saved before encryption was added (runs once; already-encrypted values are skipped)
+function encryptExistingSecrets() {
+  let n = 0;
+  for (const c of q.all('SELECT id, config FROM connections')) if (c.config && !secrets.isEncrypted(c.config)) { q.run('UPDATE connections SET config=? WHERE id=?', encrypt(c.config), c.id); n++; }
+  for (const a of q.all('SELECT id, password, graph_refresh_token FROM email_accounts')) {
+    if (a.password && !secrets.isEncrypted(a.password)) { q.run('UPDATE email_accounts SET password=? WHERE id=?', encrypt(a.password), a.id); n++; }
+    if (a.graph_refresh_token && !secrets.isEncrypted(a.graph_refresh_token)) { q.run('UPDATE email_accounts SET graph_refresh_token=? WHERE id=?', encrypt(a.graph_refresh_token), a.id); n++; }
+  }
+  for (const c of q.all('SELECT id, credentials FROM calendars')) if (c.credentials && !secrets.isEncrypted(c.credentials)) { q.run('UPDATE calendars SET credentials=? WHERE id=?', encrypt(c.credentials), c.id); n++; }
+  for (const h of q.all('SELECT id FROM households')) for (const k of SECRET_SETTINGS) {
+    const v = getSetting(h.id, k); if (v?.token && !secrets.isEncrypted(v.token)) { setSetting(h.id, k, { ...v, token: encrypt(v.token) }); n++; }
+  }
+  const fs = require('fs'), dir = path.join(DATA_DIR, 'receipts');
+  if (fs.existsSync(dir)) for (const sub of fs.readdirSync(dir)) {
+    const d = path.join(dir, sub); if (!fs.statSync(d).isDirectory()) continue;
+    for (const f of fs.readdirSync(d)) { const p = path.join(d, f), buf = fs.readFileSync(p); if (!buf.subarray(0, 8).equals(Buffer.from('HEARTHE1'))) { secrets.writeFileEncrypted(p, buf); n++; } }
+  }
+  if (n) log.info(`Encrypted ${n} saved secrets and receipt files`);
+  try { fs.chmodSync(path.join(DATA_DIR, 'hearth.db'), 0o600); } catch { /* not supported */ }
+}
+
 const PORT = config.port;
 if (require.main === module) {
   // A single failed background task must never take the whole app down
   process.on('unhandledRejection', (e) => log.error('Unexpected error (Hearth keeps running):', e?.stack || e));
   process.on('uncaughtException', (e) => log.error('Unexpected error (Hearth keeps running):', e?.stack || e));
+  try { encryptExistingSecrets(); } catch (e) { log.error('Encrypting saved secrets failed', e.message); }
   app.listen(PORT, () => { log.info(`Hearth ${config.isAddon ? 'add-on ' : ''}running on port ${PORT} · data in ${DATA_DIR}`); scheduler.start(); });
 }
 module.exports = app;

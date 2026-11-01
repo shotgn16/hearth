@@ -52,7 +52,7 @@ async function syncCalendar(cal) {
       return { events: count };
     }
     const headers = {};
-    const creds = cal.credentials ? JSON.parse(cal.credentials) : null;
+    const creds = cal.credentials ? JSON.parse(require('./secrets').decrypt(cal.credentials) || 'null') : null;
     if (creds?.username) headers.Authorization = `Basic ${Buffer.from(`${creds.username}:${creds.password}`).toString('base64')}`;
     const url = cal.url.replace(/^webcals?:\/\//i, 'https://');
     const r = await fetch(url, { headers, signal: AbortSignal.timeout(30000) });

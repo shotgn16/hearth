@@ -12,7 +12,7 @@ const b64 = (s) => Buffer.from(s, 'base64').toString('utf8');
 
 async function claimSimplefin(setupToken) {
   const claimUrl = b64(setupToken.trim().replace(/\s+/g, ''));
-  if (!/^https?:\/\//.test(claimUrl)) throw new Error("That doesn't look like a SimpleFIN setup token — copy the whole token again");
+  if (!/^https:\/\//.test(claimUrl) && !/^http:\/\/(127\.0\.0\.1|localhost)[:/]/.test(claimUrl)) throw new Error("That doesn't look like a SimpleFIN setup token — copy the whole token again");
   const r = await fetch(claimUrl, { method: 'POST', headers: { 'Content-Length': '0' }, signal: AbortSignal.timeout(30000) });
   if (r.status === 403) throw new Error('This setup token has already been used or has expired. Create a new one in your bank feed (e.g. Synci → Destinations) and paste that.');
   if (!r.ok) throw new Error(`Claiming the setup token failed (${r.status})`);
@@ -101,7 +101,7 @@ async function genericFetch(cfg, startDate) {
 }
 
 async function syncConnection(conn, { full = false } = {}) {
-  const cfg = JSON.parse(conn.config || '{}');
+  const cfg = JSON.parse(require('./secrets').decrypt(conn.config) || '{}');
   const hid = conn.household_id;
   // First sync pulls as much history as the provider allows; later syncs overlap 14 days to catch pending→posted
   const start = full || !conn.last_sync ? cfg.history_from || '2000-01-01' : new Date(new Date(conn.last_sync) - 14 * 86400000).toISOString().slice(0, 10);

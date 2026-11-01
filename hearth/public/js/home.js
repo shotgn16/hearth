@@ -10,11 +10,11 @@ export async function renderHome(el) {
     el.innerHTML = `<div class="hero"><p class="greet">Welcome, ${esc(state.me.user.name)}.</p><h2>Let's get your money in, then Hearth does the rest.</h2>
       <p class="sub">Connect your bank or drop in a few old statements. Hearth sorts, categorises and spots subscriptions on its own — you'll only hear about things that need you.</p></div>
       <div class="surface" style="margin-top:22px"><ul class="list">
-        <li class="tap" onclick="location.hash='#/settings/banks'"><div class="main"><div class="title">Connect your bank</div><div class="meta">superFin / SimpleFIN or any bank feed</div></div><span class="muted">›</span></li>
-        <li class="tap" onclick="location.hash='#/settings/import'"><div class="main"><div class="title">Import statements</div><div class="meta">CSV, OFX or QIF — years of history in one go</div></div><span class="muted">›</span></li>
-        <li class="tap" onclick="location.hash='#/settings/people'"><div class="main"><div class="title">Add your partner or family</div><div class="meta">Shared and individual budgets</div></div><span class="muted">›</span></li>
-        <li class="tap" onclick="location.hash='#/settings/calendars'"><div class="main"><div class="title">Bring in your calendars</div><div class="meta">Put budgets on birthdays, holidays and trips</div></div><span class="muted">›</span></li>
-        <li class="tap" onclick="location.hash='#/settings/ai'"><div class="main"><div class="title">Check your local AI</div><div class="meta">Pick models for chat, background jobs and receipts</div></div><span class="muted">›</span></li>
+        <li class="tap" data-go="#/settings/banks"><div class="main"><div class="title">Connect your bank</div><div class="meta">superFin / SimpleFIN or any bank feed</div></div><span class="muted">›</span></li>
+        <li class="tap" data-go="#/settings/import"><div class="main"><div class="title">Import statements</div><div class="meta">CSV, OFX or QIF — years of history in one go</div></div><span class="muted">›</span></li>
+        <li class="tap" data-go="#/settings/people"><div class="main"><div class="title">Add your partner or family</div><div class="meta">Shared and individual budgets</div></div><span class="muted">›</span></li>
+        <li class="tap" data-go="#/settings/calendars"><div class="main"><div class="title">Bring in your calendars</div><div class="meta">Put budgets on birthdays, holidays and trips</div></div><span class="muted">›</span></li>
+        <li class="tap" data-go="#/settings/ai"><div class="main"><div class="title">Check your local AI</div><div class="meta">Pick models for chat, background jobs and receipts</div></div><span class="muted">›</span></li>
       </ul></div>`;
     return;
   }

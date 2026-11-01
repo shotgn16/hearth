@@ -12,7 +12,7 @@ async function ntfy(hid, title, message) {
   if (!cfg?.url || !cfg?.topic) return;
   try {
     await fetch(`${cfg.url.replace(/\/$/, '')}/${cfg.topic}`, {
-      method: 'POST', headers: { Title: title, ...(cfg.token ? { Authorization: `Bearer ${cfg.token}` } : {}) }, body: message,
+      method: 'POST', headers: { Title: title, ...(cfg.token ? { Authorization: `Bearer ${require('./secrets').decrypt(cfg.token)}` } : {}) }, body: message,
     });
   } catch (e) { console.warn('ntfy failed', e.message); }
 }

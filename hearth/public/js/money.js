@@ -193,7 +193,7 @@ export async function txSheet(t, done) {
       <div class="row" style="grid-column:1/-1"><button type="button" class="btn ghost" data-del>Delete</button><span class="spacer"></span><button class="btn">Save</button></div></form>`);
   api(`/transactions/${t.id}/receipts`).then((rs) => {
     if (!rs.length) return;
-    el.querySelector('#txrcpt').innerHTML = `<div class="parsed" style="margin:0 0 14px">${rs.map((r) => `<div class="small">🧾 <b>Receipt from ${esc(r.merchant)}</b>${r.order_ref ? ` · ref ${esc(r.order_ref)}` : ''}${r.attachments.map((a) => ` · <a href="api/email/receipts/${r.id}/file/${encodeURIComponent(a.name)}?t=${token()}" target="_blank" rel="noopener">${esc(a.name)}</a>`).join('')} · <a href="#/receipts/approved">details</a></div>`).join('')}</div>`;
+    el.querySelector('#txrcpt').innerHTML = `<div class="parsed" style="margin:0 0 14px">${rs.map((r) => `<div class="small">🧾 <b>Receipt from ${esc(r.merchant)}</b>${r.order_ref ? ` · ref ${esc(r.order_ref)}` : ''}${r.attachments.map((a) => ` · <a href="#" data-file="api/email/receipts/${r.id}/file/${encodeURIComponent(a.name)}">${esc(a.name)}</a>`).join('')} · <a href="#/receipts/approved">details</a></div>`).join('')}</div>`;
   }).catch(() => {});
   el.querySelector('[name=work_expense]').onchange = (e) => { el.querySelector('[name=claim_status]').disabled = !e.target.checked; };
   on(el, 'click', '[data-tag]', async (e, b) => { const on_ = b.classList.toggle('on'); await api(`/transactions/${t.id}`, { method: 'PATCH', body: on_ ? { add_tag: Number(b.dataset.tag) } : { remove_tag: Number(b.dataset.tag) } }); });

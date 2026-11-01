@@ -5,7 +5,8 @@ const { config, log } = require('./config');
 
 function target(hid) {
   const manual = getSetting(hid, 'homeassistant') || {};
-  if (manual.url && manual.token) return { base: `${manual.url.replace(/\/$/, '')}/api`, token: manual.token, via: 'manual' };
+  const tok = require('./secrets').decrypt(manual.token);
+  if (manual.url && tok) return { base: `${manual.url.replace(/\/$/, '')}/api`, token: tok, via: 'manual' };
   if (process.env.SUPERVISOR_TOKEN) return { base: 'http://supervisor/core/api', token: process.env.SUPERVISOR_TOKEN, via: 'supervisor' };
   return null;
 }

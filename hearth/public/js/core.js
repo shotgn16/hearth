@@ -45,7 +45,8 @@ export function $$(sel, root = document) { return [...root.querySelectorAll(sel)
 export function on(root, event, sel, fn) {
   const key = `${event}|${sel}`; root.__hl ||= {};
   if (root.__hl[key]) root.removeEventListener(event, root.__hl[key]);
-  const h = (e) => { const t = e.target.closest(sel); if (t && root.contains(t)) fn(e, t); };
+  // an element marked data-stop (e.g. a switch inside a tappable row) keeps its clicks to itself
+  const h = (e) => { const t = e.target.closest(sel); if (!t || !root.contains(t)) return; const stop = e.target.closest('[data-stop]'); if (stop && stop !== t && t.contains(stop)) return; fn(e, t); };
   root.__hl[key] = h; root.addEventListener(event, h);
 }
 

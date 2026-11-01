@@ -55,7 +55,7 @@ async function work(box, done) {
     <div class="row" style="margin-bottom:12px"><div class="seg" style="margin:0">${Object.entries(CLAIM).map(([k, l]) => `<button data-ws="${k}" class="${workStatus === k ? 'on' : ''}">${l}</button>`).join('')}</div><span class="spacer"></span>
       <button class="btn ghost small" data-csv>Download for an expense claim</button></div>
     <div id="wbulk"></div>
-    ${w.items.length ? `<div class="surface"><ul class="list">${w.items.map((t) => txRow(t, `<input type="checkbox" data-sel="${t.id}" aria-label="Select" onclick="event.stopPropagation()">`).replace('</div></div>', `${t.claim_ref ? ` · ref ${esc(t.claim_ref)}` : ''}${t.claimed_at ? ` · claimed ${niceDate(t.claimed_at)}` : ''}${t.reimbursed_at ? ` · paid back ${niceDate(t.reimbursed_at)}` : ''}</div></div>`)).join('')}</ul></div>`
+    ${w.items.length ? `<div class="surface"><ul class="list">${w.items.map((t) => txRow(t, `<input type="checkbox" data-sel="${t.id}" aria-label="Select" data-stop>`).replace('</div></div>', `${t.claim_ref ? ` · ref ${esc(t.claim_ref)}` : ''}${t.claimed_at ? ` · claimed ${niceDate(t.claimed_at)}` : ''}${t.reimbursed_at ? ` · paid back ${niceDate(t.reimbursed_at)}` : ''}</div></div>`)).join('')}</ul></div>`
       : `<div class="empty"><b>Nothing ${CLAIM[workStatus].toLowerCase()}</b>Switch on "Work expense" on any transaction, or jot "£45 client lunch".</div>`}`;
   const bulk = () => {
     const b = box.querySelector('#wbulk'); const items = w.items.filter((t) => sel.has(t.id)); const total = items.reduce((n, t) => n + Math.abs(t.amount), 0);

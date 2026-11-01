@@ -229,7 +229,7 @@ async function processMessage(hid, acct, folder, uid, source) {
     if (!/pdf|^image\//i.test(a.contentType) || a.size > 15e6 || a.related) continue;
     const dir = path.join(RECEIPT_DIR, String(id)); fs.mkdirSync(dir, { recursive: true });
     const name = (a.filename || `attachment-${saved.length + 1}${/pdf/i.test(a.contentType) ? '.pdf' : '.jpg'}`).replace(/[^\w.\- ]/g, '_').slice(0, 100);
-    fs.writeFileSync(path.join(dir, name), a.content); saved.push({ name, type: a.contentType, size: a.size });
+    require('./secrets').writeFileEncrypted(path.join(dir, name), a.content); saved.push({ name, type: a.contentType, size: a.size });
   }
   if (saved.length) q.run('UPDATE email_receipts SET attachments=? WHERE id=?', JSON.stringify(saved), id);
   return id;
@@ -238,7 +238,7 @@ async function processMessage(hid, acct, folder, uid, source) {
 // ---------------------------------------------------------------- IMAP
 function client(acct) {
   const { ImapFlow } = require('imapflow');
-  return new ImapFlow({ host: acct.host, port: Number(acct.port) || 993, secure: !!acct.secure, auth: { user: acct.username, pass: acct.password }, logger: false,
+  return new ImapFlow({ host: acct.host, port: Number(acct.port) || 993, secure: !!acct.secure, auth: { user: acct.username, pass: require('./secrets').decrypt(acct.password) }, logger: false,
     tls: { rejectUnauthorized: acct.allow_self_signed ? false : true }, socketTimeout: 60000, greetingTimeout: 20000 });
 }
 

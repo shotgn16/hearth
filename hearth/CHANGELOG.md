@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.5.0 — security
+- Encryption at rest (AES-256-GCM) for bank feed access, mailbox passwords, Microsoft sign-in tokens, Home Assistant / ntfy tokens, calendar logins and receipt files; existing data is encrypted automatically on first start. Key kept in `hearth.key` (or `HEARTH_SECRET_KEY`)
+- Sign-ins stored only as hashes; 30-day sliding sign-in; changing a password signs out other devices; **Sign out other devices** button
+- Backups are downloaded encrypted with a passphrase you choose
+- Receipt files open without putting your sign-in in a link, inside a sandbox; only PDFs and pictures open in the browser
+- Strict Content Security Policy and other security headers; API responses are never cached; your phone no longer keeps an offline copy of your financial data
+- Slows down password guessing; bank setup tokens must use HTTPS
+- New **Settings → App settings & security** panel showing what's protected and where you're signed in
+
 ## 1.4.0
 - All settings now live inside Hearth: **Settings → App settings** (time zone, Home Assistant sensors and sign-in, log detail) and **Settings → Local AI** (Ollama address and models). The add-on's Configuration tab only has the optional network port. Your existing choices are carried over automatically
 - Stability: a failure in a background job (bank sync, alerts, sensors) is logged instead of stopping the app, so Hearth no longer crash-loops after importing unusual bank data

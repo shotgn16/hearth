@@ -11,13 +11,13 @@ const SECTIONS = [
   ['ai', 'Local AI', 'Ollama models, what the AI does for you, activity'],
   ['integrations', 'Integrations', 'Home Assistant, ntfy, price comparison'],
   ['data', 'Your data', 'Backup, export and sync timing'],
-  ['app', 'App settings', 'Time zone, Home Assistant sign-in and sensors, logs'],
+  ['app', 'App settings & security', 'Time zone, Home Assistant, encryption, signed-in devices'],
 ];
 
 export async function renderSettings(el, parts) {
   const s = parts[0];
   if (!s) {
-    el.innerHTML = `<div class="surface"><ul class="list">${SECTIONS.map(([k, l, d]) => `<li class="tap" onclick="location.hash='#/settings/${k}'"><div class="main"><div class="title">${l}</div><div class="meta">${d}</div></div><span class="muted">›</span></li>`).join('')}</ul></div>`;
+    el.innerHTML = `<div class="surface"><ul class="list">${SECTIONS.map(([k, l, d]) => `<li class="tap" data-go="#/settings/${k}"><div class="main"><div class="title">${l}</div><div class="meta">${d}</div></div><span class="muted">›</span></li>`).join('')}</ul></div>`;
     return;
   }
   document.querySelector('.topbar h1').textContent = SECTIONS.find((x) => x[0] === s)?.[1] || 'Settings';
@@ -182,7 +182,7 @@ async function workflows(el) {
   const list = await api('/rules');
   el.innerHTML = `<div class="row" style="margin-bottom:14px"><p class="muted" style="margin:0;flex:1">Workflows run on their own. Use them to file things your way, send notifications to your phones through Home Assistant, or trigger automations.</p><button class="btn" data-new>New workflow</button></div>
     ${state.me.ai?.enabled ? `<form id="dw" class="row" style="margin-bottom:18px"><input type="text" name="t" placeholder="Describe it: “ping Sam's phone when we spend over £100 at Amazon”" style="flex:1"><button class="btn soft">Build it</button></form>` : ''}
-    ${list.length ? `<div class="surface"><ul class="list">${list.map((r) => `<li class="tap" data-edit="${r.id}"><label class="switch" onclick="event.stopPropagation()"><input type="checkbox" data-en="${r.id}" ${r.enabled ? 'checked' : ''}><i></i></label>
+    ${list.length ? `<div class="surface"><ul class="list">${list.map((r) => `<li class="tap" data-edit="${r.id}"><label class="switch" data-stop><input type="checkbox" data-en="${r.id}" ${r.enabled ? 'checked' : ''}><i></i></label>
       <div class="main"><div class="title">${esc(r.name)}</div><div class="meta">When ${esc((TRIGGERS.find((t) => t[0] === r.trigger) || [, r.trigger])[1].toLowerCase())} · ran ${r.run_count} times</div></div><span class="muted">›</span></li>`).join('')}</ul></div>`
       : '<div class="empty"><b>No workflows yet</b>Try: "When a transaction over £100 comes in, notify Sam\'s phone".</div>'}`;
   el.querySelector('[data-new]').onclick = () => ruleSheet(null, () => workflows(el));
@@ -547,12 +547,22 @@ async function data(el) {
       <label class="row"><label class="switch"><input type="checkbox" name="digest" ${dg.enabled ? 'checked' : ''}><i></i></label> Morning summary notification</label>
       <label class="f"><span>At (hour, 0–23)</span><input type="number" name="hour" min="0" max="23" value="${dg.hour}"></label>
       <div class="row end" style="grid-column:1/-1"><button type="button" class="btn soft" data-syncall>Sync everything now</button><button class="btn">Save</button></div></form></div>
-    <div class="settings-group surface pad"><h3>Backup & export</h3><p class="muted small">All your data lives in a single file on this server (<code>data/hearth.db</code>). Back up that folder, or download a JSON copy here.</p>
-      <div class="row"><button class="btn soft" data-backup>Download JSON backup</button><button class="btn soft" data-csv>Export all transactions (CSV)</button></div></div>`;
+    <div class="settings-group surface pad"><h3>Backup & export</h3><p class="muted small">Everything lives on this server and is included in your Home Assistant backups (turn on backup encryption in Home Assistant). You can also download a copy locked with a passphrase — without the passphrase it can't be opened, and it can't be recovered if you forget it.</p>
+      <form id="bk" class="row" style="flex-wrap:wrap"><input type="password" name="passphrase" placeholder="Backup passphrase (8+ characters)" autocomplete="new-password" minlength="8" required style="flex:1;min-width:220px"><button class="btn soft">Download encrypted backup</button></form>
+      <div class="row" style="margin-top:10px"><button class="btn soft" data-csv>Export all transactions (CSV)</button></div>
+      <p class="small muted" style="margin-bottom:0">The CSV export is not encrypted — keep it somewhere private.</p></div>`;
   el.querySelector('#tf').onsubmit = async (e) => { e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); await api('/settings', { method: 'PUT', body: { bank_sync_hours: Number(d.bank_sync_hours), large_tx_threshold: Number(d.large_tx_threshold), digest: { enabled: !!d.digest, hour: Number(d.hour) } } }); toast('Saved'); };
   el.querySelector('[data-syncall]').onclick = async (e) => { e.target.disabled = true; await api('/sync-all', { method: 'POST' }).catch(fail); e.target.disabled = false; toast('Synced'); };
   const dl = async (path, name) => { const r = await fetch(`api${path}`, { headers: { Authorization: `Bearer ${token()}` } }); const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = name; a.click(); };
-  el.querySelector('[data-backup]').onclick = () => dl('/backup', `hearth-backup-${iso()}.json`);
+  el.querySelector('#bk').onsubmit = async (e) => {
+    e.preventDefault(); const b = e.target.querySelector('button'); b.disabled = true; b.textContent = 'Encrypting…';
+    try {
+      const r = await fetch('api/backup', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` }, body: JSON.stringify({ passphrase: e.target.passphrase.value }) });
+      if (!r.ok) throw new Error((await r.json()).error);
+      const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = `hearth-backup-${iso()}.hearth`; a.click(); e.target.reset(); toast('Encrypted backup downloaded');
+    } catch (err) { fail(err); }
+    b.disabled = false; b.textContent = 'Download encrypted backup';
+  };
   el.querySelector('[data-csv]').onclick = () => dl('/transactions/export.csv', `hearth-transactions-${iso()}.csv`);
 }
 
@@ -569,8 +579,19 @@ async function appSettings(el) {
       <label class="row" style="grid-column:1/-1"><label class="switch"><input type="checkbox" name="auto_create_ha_users" ${s.auto_create_ha_users ? 'checked' : ''}><i></i></label> Let any Home Assistant user in — they get their own Hearth login the first time they open the panel</label>` : ''}
       ${admin ? '<div class="row end" style="grid-column:1/-1"><button class="btn">Save</button></div>' : '<p class="small muted" style="grid-column:1/-1">Only an admin can change these.</p>'}
     </form></div>
+    <div class="settings-group surface pad" id="secbox"></div>
     <p class="small muted">The local AI (Ollama address and models) is under <a href="#/settings/ai">Local AI</a>. The only setting left in Home Assistant is the optional network port on the add-on's Configuration tab.</p>`;
   if (!admin) el.querySelectorAll('#sysf select, #sysf input').forEach((x) => { x.disabled = true; });
+  const sec = await api('/security');
+  el.querySelector('#secbox').innerHTML = `<h3 style="margin-top:0">Security</h3>
+    <ul class="small" style="margin:0 0 12px;padding-left:18px;line-height:1.6">
+      <li>Bank feed access, mailbox passwords and sign-in tokens, Home Assistant and calendar logins, and receipt files are encrypted on this server (${esc(sec.encryption)}; key: ${esc(sec.key_file)}).</li>
+      <li>Passwords are stored only as scrypt hashes, and sign-ins only as hashes too.</li>
+      <li>You stay signed in on a device while you use it; ${sec.session_days} days without opening Hearth signs it out. Changing your password signs out your other devices.</li>
+      <li>${sec.https ? 'This connection is encrypted (HTTPS).' : '<b>This connection is not encrypted.</b> Use Hearth through the Home Assistant app or a secure (HTTPS) address rather than the plain network port.'}</li>
+    </ul>
+    <div class="row"><span class="small muted">Signed in on ${sec.sessions} device${sec.sessions === 1 ? '' : 's'}</span><span class="spacer"></span><button class="btn soft small" data-signout ${sec.sessions > 1 ? '' : 'disabled'}>Sign out other devices</button></div>`;
+  on(el, 'click', '[data-signout]', async (e, b) => { const r = await api('/security/sign-out-others', { method: 'POST' }); toast(`Signed out ${r.ended} other device${r.ended === 1 ? '' : 's'}`); appSettings(el); });
   el.querySelector('#sysf').onsubmit = async (e) => {
     e.preventDefault(); const f = e.target;
     const body = { timezone: f.timezone.value, log_level: f.log_level.value };

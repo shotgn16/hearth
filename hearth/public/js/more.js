@@ -8,7 +8,7 @@ export async function renderMore(el) {
     ['subscriptions', 'Regular payments', icons.repeat, 'Subscriptions and bills: what\'s due, what\'s come out'], ['expenses', 'Unexpected & work', icons.alert, 'Unplanned costs and expenses to claim back'], ['receipts', 'Email receipts', icons.mail, 'Receipts and bills from your email, matched for you to approve'], ['watch', 'Price watch', icons.watch, 'Things you want, and when to buy them'],
     ['ask', 'Ask Hearth', icons.ai, 'Budget and buying advice from your local AI'], ['notes', 'Notes', icons.note, 'Everything you have jotted'], ['insights', 'Insights', icons.insights, 'Trends, forecasts and reports'],
     ['settings', 'Settings', icons.settings, 'Banks, people, workflows, integrations, local AI']];
-  el.innerHTML = `<div class="surface"><ul class="list">${items.map(([r, l, i, d]) => `<li class="tap" onclick="location.hash='#/${r}'"><span class="ico" style="background:var(--paper-2)">${i.replace('<svg', '<svg width="20"')}</span><div class="main"><div class="title">${l}</div><div class="meta">${d}</div></div><span class="muted">›</span></li>`).join('')}</ul></div>`;
+  el.innerHTML = `<div class="surface"><ul class="list">${items.map(([r, l, i, d]) => `<li class="tap" data-go="#/${r}"><span class="ico" style="background:var(--paper-2)">${i.replace('<svg', '<svg width="20"')}</span><div class="main"><div class="title">${l}</div><div class="meta">${d}</div></div><span class="muted">›</span></li>`).join('')}</ul></div>`;
 }
 
 // ---------- events & costs ----------

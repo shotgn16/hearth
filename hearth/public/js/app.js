@@ -10,6 +10,24 @@ import { renderReceipts } from './receipts.js';
 import { renderAsk } from './ask.js';
 import { renderSettings } from './settings.js';
 
+// navigation without inline scripts (allowed by the strict content security policy)
+document.addEventListener('click', (e) => {
+  const go = e.target.closest('[data-go]'); if (go) { location.hash = go.dataset.go; return; }
+  // receipt files: fetched with your sign-in (never put in a link), then opened from memory
+  const f = e.target.closest('[data-file]');
+  if (f) {
+    e.preventDefault(); const w = window.open('', '_blank');
+    fetch(f.dataset.file, { headers: { Authorization: `Bearer ${token()}` } }).then(async (r) => {
+      if (!r.ok) throw new Error('Could not open the file');
+      const url = URL.createObjectURL(await r.blob());
+      if (w) w.location = url; else location.href = url;
+      setTimeout(() => URL.revokeObjectURL(url), 120000);
+    }).catch((err) => { if (w) w.close(); fail(err); });
+    return;
+  }
+  if (e.target.closest('[data-back]')) history.back();
+});
+
 const app = $('#app');
 // Inside Home Assistant's ingress panel the URL is session-specific, so skip the offline service worker there
 export const inIngress = /\/api\/hassio_ingress\//.test(document.baseURI);
@@ -61,7 +79,7 @@ export async function route() {
   document.querySelectorAll('[data-r]').forEach((a) => a.classList.toggle('on', a.dataset.r === parts[0] || (r[2] === 'more' && a.dataset.r === 'more' && !document.querySelector(`.tabs [data-r="${parts[0]}"]`))));
   const view = $('#view');
   document.title = `${r[0]} · Hearth`;
-  view.innerHTML = `<div class="topbar">${r[2] === 'more' && parts[0] !== 'more' ? `<button class="back" onclick="history.back()" aria-label="Back">‹</button>` : ''}<h1>${esc(r[0])}</h1>
+  view.innerHTML = `<div class="topbar">${r[2] === 'more' && parts[0] !== 'more' ? `<button class="back" data-back aria-label="Back">‹</button>` : ''}<h1>${esc(r[0])}</h1>
     <button class="bell" data-bell aria-label="Notifications">${icons.bell}<span class="badge hidden" data-unread></span></button>
     <button class="avatar" style="background:${state.me.user.color}" title="${esc(state.me.user.name)}" data-me>${esc(state.me.user.name[0])}</button></div><div id="body"></div>`;
   $('[data-me]', view).onclick = () => meSheet();

@@ -109,6 +109,8 @@ db.exec(SCHEMA);
 
 // Additive migrations for databases created by earlier versions
 const MIGRATIONS = [
+  'ALTER TABLE sessions ADD COLUMN hashed INTEGER DEFAULT 0',
+  'ALTER TABLE sessions ADD COLUMN last_seen TEXT',
   'ALTER TABLE users ADD COLUMN ha_user_id TEXT',
   'ALTER TABLE ai_chats ADD COLUMN thread_id INTEGER',
   'ALTER TABLE ai_chats ADD COLUMN meta TEXT',

@@ -106,7 +106,7 @@ The sidebar panel works in the HA app on every phone. If you'd also like Hearth 
 
 ## Backups
 
-Hearth's database is in the add-on's storage and included in Home Assistant backups (it's flushed to disk just before each backup). **Settings → Your data** also offers a JSON backup and a CSV export of every transaction.
+Hearth's database is in the add-on's storage and included in Home Assistant backups (it's flushed to disk just before each backup). **Settings → Your data** also offers a passphrase-encrypted backup and a CSV export of every transaction. Bank, mailbox and calendar logins and receipt files are encrypted on disk (see the Privacy & security guide); turn on backup encryption in Home Assistant, as backups include the key.
 
 ## Troubleshooting
 
