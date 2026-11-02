@@ -4,7 +4,7 @@
 
 Hearth is built so that most days you only glance at **Today** and clear **Needs attention** when its badge appears. Everything else is there for when you want detail.
 
-On phones the main screens are in the bottom bar, with **+** in the middle for jotting things down. On a computer they're in the left sidebar.
+On phones the main screens are in the bottom bar, with **+** in the middle for jotting things down; everything else (Regular payments, Email receipts, Events & costs, Unexpected & work, Price watch, Ask Hearth, Notes, Settings) is under **More**. On a computer they're all in the left sidebar. Tap your avatar for light / dark mode and **Sign out**.
 
 ## Today
 
@@ -38,6 +38,7 @@ The only list you have to deal with. Every item is a one-tap decision:
 | **… hasn't come out** | A regular payment is late: *It's been paid* or *Skip this time*. |
 | **… charged you after it ended** | Something you'd ended took money again — check it. |
 | **Work expenses to claim** | Expenses waiting more than two weeks — go and claim them. |
+| **N email receipts to approve** | Receipts found in your mailbox — open [Email receipts](email-receipts.md) to approve or change them. |
 | **Check this note** | Fix the amount/date/category of something you jotted. |
 | **Suggestion from Hearth** | Confirm a suggestion the AI prepared. |
 
@@ -57,7 +58,7 @@ Type it the way you'd say it. Examples:
 | `school trip £25 on 14/11` | A planned £25 cost on 14 November |
 | `want a new TV under 400` | A price watch with a £400 target |
 
-If something's unclear, Hearth asks your local AI; if it still isn't sure, the note waits in Needs attention with the fields filled in for you to check.
+If something's unclear, Hearth asks your local AI; if it still isn't sure, the note waits in Needs attention with the fields filled in for you to check. **More → Notes** lists everything you've jotted and what Hearth filed it as.
 
 **Scan a receipt** (when a vision model is set): take a photo, and Hearth reads the shop, date, total and items. If your bank has already sent that payment, the items are added to it instead of creating a duplicate.
 

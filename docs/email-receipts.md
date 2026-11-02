@@ -6,7 +6,7 @@ Hearth can watch your email for receipts, invoices and bills, work out which bil
 
 ## How it works
 
-1. Every 30 minutes (you can change this) Hearth checks the mailboxes and folders you've chosen — over IMAP, Microsoft Graph (Outlook.com / Microsoft 365) or Exchange Web Services (on-premises Exchange).
+1. Every 30 minutes (change it with **Check every** in **Settings → Email receipts** — 15 minutes to 12 hours) Hearth checks the mailboxes and folders you've chosen — over IMAP, Microsoft Graph (Outlook.com / Microsoft 365) or Exchange Web Services (on-premises Exchange).
 2. It looks at subjects and senders first and only downloads emails that look like receipts, so newsletters and personal mail are skipped.
 3. From each receipt it reads the shop or company, total, date, order/invoice number, account or customer number and line items — from the email itself, from **PDF attachments**, and from receipt photos if you've set a vision model. If the rule-based reader isn't sure, your local AI helps.
 4. It works out:
@@ -61,7 +61,7 @@ Removes it from the queue. You can also choose to ignore everything from that se
 
 <img src="images/email-connect.jpg" alt="Connecting a mailbox" width="100%">
 
-Pick your provider, enter your details, press **Test**, choose the folders to check, and **Connect**. Hearth looks back over the period you choose (3 months by default) the first time, then only at new mail.
+Pick your provider, enter your details, press **Test**, choose the folders to check and whose mailbox it is, and **Connect**. Hearth looks back over the period you choose (3 months by default) the first time, then only at new mail.
 
 There are three kinds of mailbox:
 
@@ -93,7 +93,7 @@ Microsoft has switched off password sign-in, so Hearth signs in with Microsoft u
 
 - **Application (client) ID** — paste it.
 - **Account type** — *Personal* for Outlook.com / Hotmail / Live, *Work or school* for Microsoft 365, *Any* if you're not sure, or *A specific tenant ID* if your organisation only allows apps registered in its own tenant (register the app there with *Accounts in this organizational directory only*).
-- **Save and sign in with Microsoft.** Hearth shows a short code. Open **microsoft.com/devicelogin** on any device (your phone is fine), enter the code and sign in. Hearth notices within a few seconds, checks for receipts straight away, and lists your folders so you can pick e.g. a *Receipts* folder.
+- **Save and sign in with Microsoft.** Hearth shows a short code. Open **microsoft.com/devicelogin** on any device (your phone is fine), enter the code within 15 minutes and sign in. Hearth notices within a few seconds, checks for receipts straight away, and lists your folders so you can pick e.g. a *Receipts* folder.
 
 Hearth only asks for read access. It stays signed in using a refresh token; if that expires (for example after a password change), the mailbox shows **Sign in** — press it and enter a new code. Changing the client ID or account type also asks you to sign in again. One app registration can be used for every mailbox in the household.
 
@@ -128,6 +128,6 @@ Hearth signs in with NTLM and falls back to Basic. Tick *Allow a self-signed cer
 
 ## Privacy
 
-Mail is read directly from your provider (IMAP, Microsoft Graph or your Exchange server) by the add-on and processed on your Home Assistant machine. Only emails that look like receipts are downloaded; their text and PDF/image attachments are stored in Hearth's data folder (and included in HA backups). If AI help is on, receipt text goes only to your own Ollama server. Mailbox passwords and Microsoft sign-in tokens are stored in Hearth's database — use app passwords where you can; Microsoft access can be revoked at any time from your account's *Apps and services* page (or by deleting the Entra app).
+Mail is read directly from your provider (IMAP, Microsoft Graph or your Exchange server) by the add-on and processed on your Home Assistant machine. Only emails that look like receipts are downloaded; their text is kept in Hearth's database and their PDF/image attachments in its data folder, encrypted (both are included in HA backups). Attachments open in a sandbox without your sign-in ever going into a link, and anything that isn't a PDF or picture downloads instead of opening. If AI help is on, receipt text goes only to your own Ollama server. Mailbox passwords and Microsoft sign-in tokens are encrypted before they're saved and are never sent back to the browser — see [Privacy, security and backups](privacy-and-security.md#encryption). Use app passwords where you can; Microsoft access can be revoked at any time from your account's *Apps and services* page (or by deleting the Entra app).
 
 Next: [Unexpected costs and work expenses](unexpected-and-work.md)

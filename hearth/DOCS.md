@@ -4,26 +4,26 @@ Full documentation with screenshots: https://github.com/shotgn16/hearth/tree/mai
 
 Hearth takes the admin of money out of your head. Transactions arrive from your bank, get cleaned up, categorised and checked against your budgets on their own. You only hear about things that need a decision.
 
-Everything — transactions, budgets, calendar copies, AI conversations — lives in a single database inside this add-on's storage and is included in your Home Assistant backups. The only outside connections are the ones you switch on: your bank feed, product pages for price watching (they only see the product link), and your own Ollama server.
+Everything — transactions, budgets, calendar copies, AI conversations — lives in a single database inside this add-on's storage and is included in your Home Assistant backups. Bank, mailbox and calendar logins and receipt files are encrypted on disk. The only outside connections are the ones you switch on: your bank feed, your mailboxes and calendars (including Microsoft, if you sign in), your own Ollama server, ntfy, and product pages for price watching (they only see the product link).
 
 ## First run
 
-1. **Start** the add-on, then open **Hearth** from the sidebar. There's nothing to set on the Configuration tab apart from an optional network port.
-2. Create your household. Your account is linked to your Home Assistant login, so from now on opening the panel signs you straight in.
-3. **Settings → Local AI** — set the **Ollama address** (e.g. `http://192.168.1.50:11434`) and models. **Settings → App settings** — time zone, Home Assistant sensors and sign-in.
+1. **Start** the add-on (turn on **Show in sidebar**), then open **Hearth** from the sidebar. There's nothing to set on the Configuration tab apart from an optional network port.
+2. Create your household — press **Create household** once and wait a moment. Your account is linked to your Home Assistant login, so from now on opening the panel signs you straight in.
+3. **Settings → Local AI** — set the **Ollama address** (e.g. `http://192.168.1.50:11434`) and models. **Settings → App settings & security** — time zone, Home Assistant sensors and sign-in, log detail, and what's encrypted. (If you leave the Ollama address alone it tries `http://homeassistant.local:11434`.)
 4. Follow the cards: **Settings → Bank connections**, **Import statements**, **People & household**, **Calendars**.
 
 ### Adding your partner or family
 
-**Settings → People & household → Add user** creates their Hearth login. The first time they open Hearth from the HA sidebar they sign in once with that password and their HA login is linked. (Or switch on **Let any Home Assistant user in** in the add-on options to skip that step.)
+**Settings → People & household → Add user** creates their Hearth login. The first time they open Hearth from the HA sidebar they sign in once with that password and their HA login is linked. (Or switch on **Let any Home Assistant user in** under **Settings → App settings & security** to skip that step.)
 
 Budgets and targets can belong to **everyone together**, **one user**, or **a person you spend on** (children, parents, pets). Accounts can be joint or owned by one of you.
 
-## Bank connection (superFin)
+## Bank connection (Synci, superFin, SimpleFIN)
 
-**Settings → Bank connections.** Paste the setup token or access URL from superFin. Hearth speaks the SimpleFIN protocol, which most self-hosted bank bridges use: it claims the token once, keeps the access URL in the local database, pulls all the history the bank allows, then syncs every 4 hours (with a 14-day overlap so pending payments settle properly).
+**Settings → Bank connections.** Paste the setup token or access URL from your bank feed — **Synci** for UK banks (Destinations → SimpleFIN), superFin or SimpleFIN Bridge. Hearth speaks the SimpleFIN protocol: it claims the token once, keeps the access URL encrypted in the local database, pulls history 90 days at a time (up to about 2 years), then syncs every 4 hours (with a 14-day overlap so pending payments settle properly). If the first import fails, the connection is kept — press **Sync now** to retry without a new token.
 
-If superFin turns out to use a different API, open **"superFin uses a different API?"** on the same screen and map its accounts URL, transactions URL, auth header and field names — no code needed.
+For a feed with a different API, open **"superFin uses a different API? Map any JSON bank feed"** on the same screen and map its accounts URL, transactions URL, auth header and field names — no code needed.
 
 For older history, **Import statements** takes CSV, OFX/QFX and QIF from any UK bank; drop several files at once and overlaps are de-duplicated.
 
@@ -51,14 +51,16 @@ All of this works with no tokens or setup because Hearth runs as an add-on:
 
 | Entity | What it is |
 |---|---|
-| `sensor.hearth_free_to_spend` | Money free until payday after bills already committed (attributes: `payday`, `committed`) |
+| `sensor.hearth_free_to_spend` | Money free until payday after bills already committed (attributes: `payday`, `until`, `committed`) |
 | `sensor.hearth_spent_this_month` | Spending so far this month |
 | `sensor.hearth_balance` | Total across accounts |
 | `sensor.hearth_needs_attention` | Items waiting in Needs attention |
-| `sensor.hearth_next_payment` | Date of the next regular payment (attributes: `merchant`, `amount`) |
+| `sensor.hearth_next_payment` | Date of the next regular payment, or `none` (attributes: `merchant`, `amount`) |
+
+Turn them off with **Publish sensors** in **Settings → App settings & security**.
 
 **Workflow actions for HA.**
-- *Fire a Home Assistant event* — e.g. `hearth_big_spend`, with `merchant`, `amount`, `category_id` and `date` in the event data. Use it as an **Event** trigger in an automation.
+- *Fire a Home Assistant event* — e.g. `hearth_big_spend`, with `rule`, `merchant`, `amount`, `category_id` and `date` (plus `name` and `pct` for budget triggers) in the event data. Use it as an **Event** trigger in an automation.
 - *Call a Home Assistant service* — e.g. `light.turn_on` with `{"entity_id":"light.hallway","color_name":"orange"}` to flash a light when a budget hits 90%.
 
 Example automation using an event from Hearth:
@@ -88,7 +90,7 @@ When a next step would help, it **prepares a suggestion card** — create a budg
 
 Conversations are kept, so you can come back to them. Quick tools on the Ask screen: last month's review, suggested budgets, subscription check, "Should I buy…?", receipt scanning.
 
-**Which model?** Tool calling needs a model that supports it. Good choices on home hardware: `qwen2.5:7b-instruct` (your current one), `qwen3:8b`, `llama3.1:8b`. If your model can't use tools, Hearth notices and answers from a summary of your data instead. A 3B model (e.g. `qwen2.5:3b-instruct`) is a good **Fast model** for background categorising.
+**Which model?** Tool calling needs a model that supports it. Good choices on home hardware: `qwen2.5:7b-instruct` (the default), `qwen3:8b`, `llama3.1:8b`. If your model can't use tools, Hearth notices and answers from a summary of your data instead. A 3B model (e.g. `qwen2.5:3b-instruct`) is a good **Fast model** for background categorising.
 
 ### What the AI does in the background (each can be switched off)
 
@@ -102,11 +104,11 @@ Elsewhere: **Estimate with AI** on any calendar event, **Ask AI what to cut** on
 
 ## Using it outside Home Assistant
 
-The sidebar panel works in the HA app on every phone. If you'd also like Hearth as its own installed app (its own home-screen icon outside the HA app), set a host port for `8484/tcp` on the add-on's **Network** section and put it behind HTTPS (Nginx Proxy Manager or the NGINX add-on). Sign in with your Hearth email and password there.
+The sidebar panel works in the HA app on every phone. If you'd also like Hearth as its own installed app (its own home-screen icon outside the HA app), set a host port for `8484/tcp` on the add-on's **Network** section and put it behind HTTPS (Nginx Proxy Manager or the NGINX add-on). Sign in with your Hearth email and password there. Don't expose the port directly to the internet — use the HA app, a VPN or an HTTPS reverse proxy.
 
 ## Backups
 
-Hearth's database is in the add-on's storage and included in Home Assistant backups (it's flushed to disk just before each backup). **Settings → Your data** also offers a passphrase-encrypted backup and a CSV export of every transaction. Bank, mailbox and calendar logins and receipt files are encrypted on disk (see the Privacy & security guide); turn on backup encryption in Home Assistant, as backups include the key.
+Hearth's database is in the add-on's storage and included in Home Assistant backups (it's flushed to disk just before each backup) — restore Hearth by restoring the add-on from a Home Assistant backup. **Settings → Your data** also offers a passphrase-encrypted copy of your household's data (`.hearth` file) and a CSV export of every transaction. Bank, mailbox and calendar logins and receipt files are encrypted on disk with the key in `hearth.key` (see the Privacy & security guide); turn on backup encryption in Home Assistant, as backups include the key.
 
 ## Troubleshooting
 
@@ -114,3 +116,5 @@ Hearth's database is in the add-on's storage and included in Home Assistant back
 - **Answers are slow** — the first question loads the model; set *Keep model loaded for* higher. Use a smaller Fast model for background jobs.
 - **The assistant invents numbers or ignores tools** — try a larger or tool-capable model, or set Creativity to Precise.
 - **Calendar from HA shows nothing** — check the entity has events in HA's own calendar view, then press Sync in Hearth.
+- **"Already set up" (403) in the log** — the setup form was sent a second time (pressed twice, or an old *Set up Hearth* page was still open on another device). The first one worked: reload the panel and sign in with the account you created.
+- **More detail in the log** — **Settings → App settings & security → Log detail → Everything (for troubleshooting)**, then check the add-on's **Log** tab. Each `Hearth add-on running on port 8484` line is one start of the add-on.

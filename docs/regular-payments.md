@@ -2,7 +2,7 @@
 
 [← Documentation](../README.md#documentation)
 
-**More → Regular payments** keeps track of every subscription and bill: when each one is due, whether it has come out this month, and what you've paid over time.
+**Regular payments** (under **More** on phones) keeps track of every subscription and bill: when each one is due, whether it has come out this month, and what you've paid over time.
 
 Hearth finds most of them on its own from your bank transactions (anything that repeats weekly, fortnightly, monthly, quarterly or yearly at a steady amount) and splits them into **subscriptions** and **bills**. You can add anything it hasn't spotted.
 

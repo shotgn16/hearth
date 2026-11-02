@@ -18,6 +18,8 @@ Birthdays, holidays, school trips and weddings are where budgets usually go wron
 - **Outlook.com:** Settings → Calendar → Shared calendars → *Publish a calendar* → *Can view all details* → copy the ICS link.
 - **Exchange / Microsoft 365:** Outlook on the web → Settings → Calendar → Shared calendars → *Publish a calendar*. For on-premises Exchange, publishing must be allowed by your admin.
 
+If a link needs a login, enter the username and password with it; they're stored encrypted.
+
 Either way, Hearth keeps a **full local copy**: 3 years back and 2 years ahead, refreshed every hour, with recurring events expanded. Events you've attached a budget or cost to are kept even if they're later deleted in the source calendar.
 
 ## Events & costs

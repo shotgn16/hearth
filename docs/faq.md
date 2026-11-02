@@ -11,7 +11,13 @@ Refresh the store page (⋮ → Check for updates). Hearth needs a 64-bit system
 The ready-made image for that version may still be building (it takes a few minutes after an update is published) — try again shortly. If it keeps failing, check the [Actions tab](https://github.com/shotgn16/hearth/actions) on GitHub.
 
 **Where are the logs?**
-The add-on's **Log** tab. Set **Log level** to `debug` in the configuration for more detail.
+The add-on's **Log** tab. For more detail, set **Settings → App settings & security → Log detail** to **Everything (for troubleshooting)** (admins only). Docker installs: `docker compose logs hearth`.
+
+**The log shows `Hearth add-on running on port 8484` many times.**
+Each of those lines is one start of the add-on, so it has been restarted — by you, by a Home Assistant update or reboot, or by the Supervisor watchdog. Hearth logs errors in its background jobs instead of stopping, so if it keeps restarting with nothing in between, look at **Settings → System → Logs → Supervisor** around the same times, and turn on more log detail as above.
+
+**I saw "Error: Already set up" (status 403) in the log.**
+Something sent the first-run setup form again after the household had been created — usually **Create household** pressed twice, or an old *Set up Hearth* page left open on another device or tab. Nothing was changed. Reload Hearth and sign in with the account you created; add other people from **Settings → People & household**.
 
 ## Signing in
 
@@ -19,12 +25,24 @@ The add-on's **Log** tab. Set **Log level** to `debug` in the configuration for 
 That's the one-time link between your HA login and your Hearth account. Afterwards the panel signs you in automatically.
 
 **My partner sees the setup screen / can't get in.**
-Add them under **Settings → People & household → Add user**, give them the temporary password, and they sign in once from the HA sidebar. Or switch on **Let any Home Assistant user in**.
+Add them under **Settings → People & household → Add user**, give them the temporary password, and they sign in once from the HA sidebar. Or switch on **Let any Home Assistant user in** under **Settings → App settings & security**. (If they were looking at *Set up Hearth* from before you created the household, they just need to reload.)
+
+**"Too many wrong passwords — wait 15 minutes".**
+After 8 wrong passwords for one account (or 20 from one address) in 15 minutes, sign-in pauses for 15 minutes. Restarting the add-on also clears it.
+
+**I've been signed out.**
+Sign-ins end after 30 days without opening Hearth, when your password is changed, or when someone presses **Sign out other devices**. Inside the HA panel you're signed straight back in.
+
+**I forgot my Hearth password.**
+Another admin can set a new one under **Settings → People & household → Edit**. Inside the HA panel you're still signed in automatically once your HA login is linked, so you can change it yourself there.
 
 ## Bank and import
 
-**"Claiming setup token failed".**
-Setup tokens work once. Generate a new one in superFin and paste that — or paste the access URL directly.
+**"Claiming setup token failed" / the token is used or expired.**
+Setup tokens work once. Generate a new one in Synci, superFin or SimpleFIN Bridge and paste that — or paste the access URL directly. If the connection was created but the first import failed, you don't need a new token: press **Sync now** on it.
+
+**Bank payments stopped arriving (Synci).**
+Synci asks you to re-approve your bank about every 90 days. Renew it in Synci and Hearth carries on at the next sync.
 
 **Some transactions appear twice.**
 Usually two overlapping exports from a bank that changes descriptions between exports. Select the duplicates in the grid and delete them.
@@ -83,18 +101,27 @@ Pick your phone's `mobile_app_…` service in **Settings → Integrations**, or 
 The link opens the add-on's panel; make sure **Show in sidebar** is on for the add-on.
 
 **`sensor.hearth_*` entities are missing.**
-Check **Publish sensors** is on in **Settings → App settings**. They appear within 15 minutes of the add-on starting and reappear shortly after an HA restart.
+Check **Publish sensors** is on in **Settings → App settings & security**. They appear within 15 minutes of the add-on starting and reappear shortly after an HA restart.
 
 **An HA calendar shows no events.**
 Check the entity shows events in HA's own Calendar view, then press **Sync** in **Settings → Calendars**.
 
 ## General
 
+**A bank connection or mailbox stops working after restoring or moving Hearth.**
+Saved logins are encrypted with `hearth.key` in Hearth's data folder (or `HEARTH_SECRET_KEY`). If the database was restored without that key, the log says *A stored secret could not be decrypted* — reconnect the bank feeds and mailboxes, or restore the matching key. Transactions and everything else are unaffected.
+
 **Can I use it on my phone?**
-Yes — open Hearth from the sidebar of the Home Assistant app.
+Yes — open Hearth from the sidebar of the Home Assistant app. To install it as its own app, see [Using Hearth outside the panel](home-assistant.md#using-hearth-outside-the-panel-optional-network-port).
+
+**Does my phone keep a copy of my finances?**
+No. Financial data is never cached on the device; only the app's own code is kept so it starts quickly.
 
 **Does it support currencies other than GBP?**
 Amounts display in pounds today; other currencies are on the roadmap.
 
 **How do I update?**
-When a new version is pushed, Home Assistant shows an **Update** button on the add-on. Your data is kept.
+When a new version is pushed, Home Assistant shows an **Update** button on the add-on. Your data is kept, and anything saved before encryption was added (version 1.5.0) is encrypted automatically on the first start.
+
+**How do I restore a backup?**
+Restore the Hearth add-on from a Home Assistant backup (Docker: put the `data` folder back). The encrypted `.hearth` download from **Settings → Your data** is a passphrase-locked copy of your data for safekeeping; it doesn't include bank, mailbox or calendar connections, and there's no button to load it back in yet.

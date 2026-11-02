@@ -498,7 +498,7 @@ async function aiSettings(el) {
       <label class="row" style="grid-column:1/-1"><label class="switch"><input type="checkbox" name="enabled" ${o.enabled !== false ? 'checked' : ''}><i></i></label> Use local AI</label>
       <label class="f" style="grid-column:1/-1"><span>Ollama address</span><input type="text" name="url" value="${esc(o.url || '')}" placeholder="http://homeassistant.local:11434"></label>
     </div></div>
-    <div class="settings-group surface pad"><h3>Models</h3><p class="muted small">Pick a model for each job. Leave a box empty to use the default from the add-on options.</p><div class="kv">
+    <div class="settings-group surface pad"><h3>Models</h3><p class="muted small">Pick a model for each job. Leave a box empty to use the default — background jobs then use the chat model.</p><div class="kv">
       <label class="f"><span>Chat & advice</span><select name="model" data-models data-cur="${esc(o.model || '')}"></select></label>
       <label class="f"><span>Background jobs (fast)</span><select name="fast_model" data-models data-cur="${esc(o.fast_model || '')}"></select></label>
       <label class="f"><span>Receipts (vision)</span><select name="vision_model" data-models data-cur="${esc(o.vision_model ?? '')}" data-allow-none></select></label>

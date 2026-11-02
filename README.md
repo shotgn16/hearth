@@ -11,7 +11,7 @@ A self-hosted finance manager for individuals and families that runs as a Home A
 
 Hearth takes the admin of money out of your head. Transactions arrive from your bank, get cleaned up, categorised and checked against your budgets on their own. You only hear about the few things that genuinely need a decision.
 
-Everything stays on your Home Assistant machine — transactions, budgets, calendar copies and AI conversations live in one local database that's included in your HA backups.
+Everything stays on your Home Assistant machine — transactions, budgets, calendar copies and AI conversations live in one local database that's included in your HA backups. Bank, mailbox and calendar logins and receipt files are encrypted on disk.
 
 ## What it does
 
@@ -23,8 +23,8 @@ Everything stays on your Home Assistant machine — transactions, budgets, calen
 | **The whole household** — separate logins; budgets and targets that are shared, one person's own, or for the kids. | **Regular payments tracker** — subscriptions and bills found automatically; set payment dates, see what's come out this month, ongoing / cancelling / ended with last payments, a 12-month history grid. |
 | **Calendars** — your HA calendars, Outlook / Microsoft 365 via sign-in, or iCal links with budgets and real costs on events. | **Home Assistant** — notifications to your phones, sensors for dashboards, events and service calls from workflows. |
 | **Unexpected costs & work expenses** — flag unplanned costs and see what to put aside; track work expenses from to claim → claimed → paid back. | **Price watch** — PriceRunner or any shop; tells you when it's a good time to buy. |
-| **Email receipts** — Hearth watches your mailbox (Gmail, iCloud, Outlook / Microsoft 365, Exchange or any IMAP), reads receipts and PDF bills, matches each to the right bill, payment and account, and waits for your approval. | **Bank sync** — superFin / SimpleFIN or any JSON feed, plus CSV/OFX/QIF import for years of history. |
-| **Workflows** — automatic rules for categories, tags, flags, notifications and Home Assistant. | |
+| **Email receipts** — Hearth watches your mailbox (Gmail, iCloud, Outlook / Microsoft 365, Exchange or any IMAP), reads receipts and PDF bills, matches each to the right bill, payment and account, and waits for your approval. | **Bank sync** — any SimpleFIN feed (Synci for UK banks, superFin, SimpleFIN Bridge) or any JSON feed, plus CSV/OFX/QIF import for years of history. |
+| **Workflows** — automatic rules for categories, tags, flags, notifications and Home Assistant. | **Secure by default** — secrets and receipt files encrypted at rest, passphrase-locked backups, hashed sign-ins, a strict browser lock-down. |
 
 <p align="center">
 <img src="docs/images/today-phone.jpg" alt="Today on a phone" width="250">
@@ -36,8 +36,8 @@ Everything stays on your Home Assistant machine — transactions, budgets, calen
 
 1. Click **Add repository** above, or in Home Assistant go to **Settings → Add-ons → Add-on Store → ⋮ → Repositories** and add `https://github.com/shotgn16/hearth`.
 2. Find **Hearth** in the store and press **Install**. Home Assistant downloads a ready-made image — nothing is built on your machine.
-3. On the **Configuration** tab, enter your **Ollama address** and **Chat model**.
-4. **Start** it, then open **Hearth** from the sidebar and create your household.
+3. **Start** it (turn on **Show in sidebar**), then open **Hearth** from the sidebar and create your household. There's nothing to fill in on the add-on's Configuration tab.
+4. Inside Hearth, set your **Ollama address** and models under **Settings → Local AI**, and your time zone under **Settings → App settings & security**.
 
 Then follow [Getting started](docs/getting-started.md).
 
@@ -64,7 +64,7 @@ Works on `amd64` and `aarch64` (Raspberry Pi 4/5, most mini PCs, HA Green/Yellow
 
 ## Privacy in one paragraph
 
-Hearth has no cloud, no account with us and no telemetry. It only connects to the things you set up: your bank feed, your calendars, your mailboxes (for receipts), your Ollama server, Home Assistant, and shop pages for price watching (which receive only the product link). Read more in [Privacy, security and backups](docs/privacy-and-security.md).
+Hearth has no cloud, no account with us and no telemetry. It only connects to the things you set up: your bank feed, your calendars, your mailboxes (for receipts), your Ollama server, Home Assistant, ntfy if you switch it on, and shop pages for price watching (which receive only the product link). Read more in [Privacy, security and backups](docs/privacy-and-security.md).
 
 ## Licence
 
