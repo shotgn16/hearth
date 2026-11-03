@@ -1,0 +1,63 @@
+/* Hearth phone app — the connect screen. Same colours as the Hearth web app (server/web/styles.css). */
+:root {
+  --ink: #1f2e28; --ink-2: #4c5c55; --ink-3: #7d8a84; --line: #d9e0da;
+  --bg: #edf1ec; --paper: #fafbf8; --paper-2: #f3f6f2;
+  --amber: #d9962b; --amber-soft: #f7e7c9; --green: #2f7d5b; --green-soft: #dcefe5; --red: #b4432f; --red-soft: #f8e4df;
+  --font: ui-rounded, "SF Pro Rounded", -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --ink: #e4ece7; --ink-2: #aebdb5; --ink-3: #7f8f87; --line: #2e3d37; --bg: #121c18; --paper: #1a2621; --paper-2: #202e28;
+    --amber: #e8aa45; --amber-soft: #3b2f1a; --green: #5fbf92; --green-soft: #1d3a2d; --red: #ec8a77; --red-soft: #3b231e; }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 var(--font); -webkit-font-smoothing: antialiased; }
+main { max-width: 520px; margin: 0 auto; min-height: 100dvh;
+  padding: calc(28px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left)); }
+h1 { font-size: 26px; margin: 8px 0 6px; letter-spacing: -0.01em; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); margin: 26px 0 8px; font-weight: 650; }
+p { margin: 0 0 12px; }
+.muted { color: var(--ink-2); }
+.small { font-size: 14px; }
+.center { text-align: center; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand span { font-weight: 750; font-size: 20px; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 18px; border-radius: 14px; border: 0;
+  background: var(--ink); color: var(--bg); font: inherit; font-weight: 650; cursor: pointer; }
+.btn.soft { background: var(--paper); color: var(--ink); border: 1px solid var(--line); }
+.btn.wide { width: 100%; }
+.btn:disabled { opacity: .55; }
+.row { display: flex; gap: 10px; }
+.row > * { flex: 1; }
+.stack > * + * { margin-top: 10px; }
+
+input { width: 100%; min-height: 50px; padding: 0 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font: inherit; font-size: 17px; }
+input:focus { outline: 2.5px solid var(--amber); outline-offset: 1px; }
+label span { display: block; font-size: 14px; font-weight: 650; margin-bottom: 6px; color: var(--ink-2); }
+
+.list { list-style: none; margin: 0; padding: 0; background: var(--paper); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+.list li { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
+.list li + li { border-top: 1px solid var(--line); }
+.list .main { flex: 1; min-width: 0; }
+.list .title { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list .meta { font-size: 13px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list button.open { all: unset; flex: 1; min-width: 0; cursor: pointer; }
+.icon-btn { all: unset; cursor: pointer; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; color: var(--ink-3); }
+
+.note { padding: 12px 14px; border-radius: 14px; background: var(--paper); border: 1px solid var(--line); font-size: 15px; }
+.note.ok { background: var(--green-soft); border-color: transparent; }
+.note.bad { background: var(--red-soft); border-color: transparent; }
+.spin { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--line); border-top-color: var(--amber); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -3px; margin-right: 6px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.scanner { position: fixed; inset: 0; background: #000; z-index: 10; display: flex; flex-direction: column; }
+.scanner video { flex: 1; width: 100%; object-fit: cover; }
+.scanner .frame { position: absolute; left: 50%; top: 45%; width: min(70vw, 300px); aspect-ratio: 1; transform: translate(-50%, -50%);
+  border: 3px solid rgba(255,255,255,.9); border-radius: 24px; box-shadow: 0 0 0 100vmax rgba(0,0,0,.45); }
+.scanner .bar { position: absolute; left: 0; right: 0; bottom: 0; padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); color: #fff; text-align: center; }
+.scanner .bar p { color: #fff; }
+.steps { padding-left: 20px; margin: 6px 0 0; }
+.steps li { margin-bottom: 6px; }
+.gap { margin-top: 10px; }
+.gap-lg { margin-top: 40px; }

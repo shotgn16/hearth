@@ -167,6 +167,17 @@ test('phones & devices: addresses with QR codes', async () => {
   assert.match(first.qr_app, /^<svg/);
 });
 
+test('the phone app may check /api/status, and nothing else', async () => {
+  for (const origin of ['capacitor://localhost', 'http://localhost']) {
+    const r = await h.call('GET', '/api/status', undefined, { Origin: origin });
+    assert.equal(r.headers.get('access-control-allow-origin'), origin);
+  }
+  const other = await h.call('GET', '/api/status', undefined, { Origin: 'https://evil.example' });
+  assert.equal(other.headers.get('access-control-allow-origin'), null);
+  const me = await h.call('GET', '/api/me', undefined, { Origin: 'capacitor://localhost' });
+  assert.equal(me.headers.get('access-control-allow-origin'), null, 'signed-in data is never shared with other origins');
+});
+
 test('sign out ends the session', async () => {
   assert.equal((await h.call('POST', '/api/logout', {})).status, 200);
   assert.equal((await h.call('GET', '/api/me')).status, 401);

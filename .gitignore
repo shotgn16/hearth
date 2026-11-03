@@ -11,3 +11,4 @@ desktop/build/resources/
 mobile/www/vendor/
 mobile/android/app/build/
 mobile/ios/App/build/
+mobile/www/icon.svg

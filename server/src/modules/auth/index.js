@@ -14,9 +14,18 @@ const failures = new Map();
 const tooMany = (k, max) => { const f = failures.get(k); return f && f.n >= max && Date.now() - f.t < 15 * 60000; };
 const failed = (k) => { const f = failures.get(k); failures.set(k, f && Date.now() - f.t < 15 * 60000 ? { n: f.n + 1, t: f.t } : { n: 1, t: Date.now() }); };
 
+// The Hearth phone app checks an address is really Hearth before opening it. Its connect screen runs from the app
+// itself (capacitor://localhost on iPhone/iPad, http://localhost on Android), so only /api/status answers it.
+const APP_ORIGINS = ['capacitor://localhost', 'http://localhost', 'https://localhost'];
+function allowPhoneApp(req, res) {
+  if (APP_ORIGINS.includes(req.headers.origin)) { res.setHeader('Access-Control-Allow-Origin', req.headers.origin); res.setHeader('Vary', 'Origin'); }
+}
+
 // Routes that work before signing in
 function publicRoutes(api) {
+  api.options('/status', (req, res) => { allowPhoneApp(req, res); res.setHeader('Access-Control-Allow-Methods', 'GET'); res.status(204).end(); });
   api.get('/status', (req, res) => {
+    allowPhoneApp(req, res);
     const ha = haIdentity(req);
     res.json({ needsSetup: !q.get('SELECT 1 FROM users LIMIT 1'), version: config.version, addon: config.isAddon, ha_user: ha ? { name: ha.name } : null });
   });
