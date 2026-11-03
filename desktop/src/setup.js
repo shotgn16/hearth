@@ -84,6 +84,7 @@ class Setup {
     const host = phone ? '0.0.0.0' : '127.0.0.1';
     const dataDir = cfg.dataDir || this.store.get('dataDir') || this.paths.localData;
     let port = cfg.port;
+    await this.localServer.stopLeftover?.();
     if (!(await this.net.portFree(port))) {
       const existing = await hearthStatus(`http://127.0.0.1:${port}`, 1500).catch(() => null);
       if (existing) throw new Error(`Another Hearth (${existing.version}) is already running on port ${port} — perhaps a household server or Docker. Choose "Connect to an existing Hearth", or another port.`);
@@ -150,6 +151,7 @@ class Setup {
     const s = this.store.all();
     if (s.mode === 'local' || s.mode === 'local-phone') {
       try {
+        await this.localServer.stopLeftover?.();
         if (!(await this.net.portFree(s.port))) {
           const other = await hearthStatus(`http://127.0.0.1:${s.port}`, 1500).catch(() => null);
           if (!other) throw new Error(`Port ${s.port} is being used by another program. Use "Change setup…" to pick another port.`);

@@ -15,12 +15,10 @@ files:
 
 # Bundled by scripts/prepare-resources.mjs into build/resources/<platform>-<arch>
 extraResources:
-  - from: build/resources/${platform}-${arch}/runtime
-    to: runtime
-  - from: build/resources/${platform}-${arch}/server
-    to: server
-  - from: build/resources/${platform}-${arch}/winsw
-    to: winsw
+  # runtime/, server/ (with its node_modules) and winsw/ — copied as one folder, because electron-builder
+  # always drops a node_modules folder sitting directly at the top of an extraResources entry
+  - from: build/resources/${platform}-${arch}
+    to: .
     filter: ["**/*"]
 
 publish:
@@ -80,6 +78,9 @@ nsis:
 
 linux:
   icon: build/icon.png
+  maintainer: shotgn16 <shotgn16@users.noreply.github.com>
+  vendor: shotgn16
+  syncDesktopName: true
   category: Office;Finance
   executableName: hearth
   synopsis: Household money manager with local AI

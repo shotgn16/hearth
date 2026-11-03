@@ -18,6 +18,8 @@
   let S = null;                  // app state from the main process
   let cfg = { mode: null };      // what the person chose
   let busy = false;
+  let onProgress = () => {};     // where progress lines go while a setup is being applied
+  hearth.onProgress((ev) => onProgress(ev));
 
   const qs = new URLSearchParams(location.search);
   hearth.onPrefill((p) => { cfg = { ...cfg, ...p }; details(); });
@@ -150,7 +152,7 @@
       log.insertAdjacentHTML('beforeend', `<li class="${esc(ev.type)}"><span class="i">${icon}</span><span>${esc(ev.message)}</span></li>`);
     };
     log.innerHTML = '';
-    hearth.onProgress(add);
+    onProgress = add;
     const res = await hearth.apply({ ...cfg });
     busy = false;
     log.querySelectorAll('.spin').forEach((s) => { s.parentElement.textContent = res.ok ? '✓' : '·'; });

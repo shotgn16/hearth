@@ -2,9 +2,12 @@
   "name": "hearth-desktop",
   "productName": "Hearth",
   "version": "1.5.0",
-  "description": "Hearth household money manager — desktop app and installer",
+  "description": "Hearth household money manager \u2014 desktop app and installer",
   "homepage": "https://github.com/shotgn16/hearth",
-  "author": { "name": "shotgn16", "url": "https://github.com/shotgn16" },
+  "author": {
+    "name": "shotgn16",
+    "url": "https://github.com/shotgn16"
+  },
   "license": "MIT",
   "main": "src/main.js",
   "private": true,
@@ -23,5 +26,6 @@
   "devDependencies": {
     "electron": "44.10.0",
     "electron-builder": "26.17.0"
-  }
+  },
+  "desktopName": "hearth.desktop"
 }

@@ -16,8 +16,22 @@ class LocalServer extends EventEmitter {
 
   async start(opts) {
     this.opts = opts; this.wanted = true;
+    if (!this.child) { fs.mkdirSync(this.logs, { recursive: true }); await this.stopLeftover(); }
     await this.spawn();
     return this.waitReady();
+  }
+
+  get pidFile() { return path.join(this.logs, 'server.pid'); }
+
+  // A server left behind when the app was force-closed would hold the port and the data — stop it first.
+  // Only if Hearth really answers on the port it used (process IDs get reused, especially on Windows).
+  async stopLeftover() {
+    let old; try { old = JSON.parse(fs.readFileSync(this.pidFile, 'utf8')); } catch { return; }
+    fs.rmSync(this.pidFile, { force: true });
+    if (!old?.pid || !old.port) return;
+    try { const r = await fetch(`http://127.0.0.1:${old.port}/api/status`, { signal: AbortSignal.timeout(1500) }); if (!r.ok) return; } catch { return; }
+    try { process.kill(old.pid, 'SIGTERM'); } catch { return; }
+    for (let i = 0; i < 20; i++) { try { process.kill(old.pid, 0); } catch { return; } await new Promise((r) => setTimeout(r, 200)); }
   }
 
   spawn() {
@@ -36,9 +50,11 @@ class LocalServer extends EventEmitter {
       ...(this.opts.ollamaUrl ? { OLLAMA_URL: this.opts.ollamaUrl } : {}),
     };
     this.child = spawn(this.node, [this.serverEntry], { env, stdio: ['ignore', log, log], windowsHide: true });
+    try { fs.writeFileSync(this.pidFile, JSON.stringify({ pid: this.child.pid, port: this.opts.port })); } catch { /* not important */ }
     this.child.once('exit', (code, signal) => {
       fs.closeSync(log);
       this.child = null;
+      fs.rmSync(this.pidFile, { force: true });
       this.emit('exit', { code, signal });
       if (!this.wanted) return;
       // Restart after an unexpected stop, but give up if it keeps failing (5 times in 2 minutes)

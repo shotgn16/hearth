@@ -31,7 +31,7 @@ app.whenReady().then(async () => {
     runCliElevated: (args, o) => runCliElevated(paths, args, o),
     confirm: async (message, detail) => (await dialog.showMessageBox(wizardWin || mainWin, { type: 'question', buttons: ['Remove', 'Keep'], defaultId: 0, cancelId: 1, message, detail })).response === 0,
   });
-  server.on('failed', (lines) => dialog.showErrorBox('Hearth stopped', `Hearth stopped unexpectedly and couldn't restart.\n\n${lines}\n\nThe full log is in ${path.join(paths.logs, 'server.log')}`));
+  if (!SMOKE) server.on('failed', (lines) => dialog.showErrorBox('Hearth stopped', `Hearth stopped unexpectedly and couldn't restart.\n\n${lines}\n\nThe full log is in ${path.join(paths.logs, 'server.log')}`));
 
   if (SMOKE) return smokeTest();
   lockDownSessions();
