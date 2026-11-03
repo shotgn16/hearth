@@ -16,6 +16,7 @@ Install
   service install            Start Hearth with the computer (systemd / launchd / Windows service)
                                --port 8484 --host 0.0.0.0 --data <folder> --scope system|user
                                --user <account> (macOS/Linux) --copy-to <folder> --ollama-url <url>
+                               --import-data <folder>  copy existing Hearth data in first (if the new folder is empty)
   service uninstall | status | start | stop | restart
   docker install             Run Hearth in Docker here.  --dir <folder> --port 8484 --image <image>
   docker uninstall           Stop and remove the container (keeps your data).  --dir <folder>
@@ -29,13 +30,14 @@ Accounts
 Common options
   --json                     Machine-readable output (one JSON object per line)
   --dry-run                  Show what would happen without changing anything
+  --log-file <file>          Also write progress (JSON lines) to a file
   --version                  Show the version
 `;
 
 async function main(argv) {
   const a = parseArgs(argv);
   const [cmd = 'start', sub] = a._;
-  const r = reporter(!!a.json);
+  const r = reporter(!!a.json, a.logFile && a.logFile !== true ? a.logFile : null);
   if (a.data && a.data !== true) process.env.DATA_DIR = path.resolve(a.data);
   if (a.version || cmd === 'version') { console.log(require('../../package.json').version); return; }
   if (a.help || cmd === 'help') { console.log(HELP); return; }
@@ -86,6 +88,7 @@ async function main(argv) {
     }
     if (a.json) r.result(result ?? null);
   } catch (e) {
+    if (a.logFile && a.logFile !== true) try { require('fs').appendFileSync(a.logFile, `${JSON.stringify({ type: 'error', message: e.message })}\n`); } catch { /* ignore */ }
     if (a.json) process.stdout.write(`${JSON.stringify({ type: 'error', message: e.message })}\n`);
     else console.error(`✗ ${e.message}`);
     if (!(e instanceof CliError) && process.env.HEARTH_DEBUG) console.error(e.stack);

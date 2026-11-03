@@ -49,6 +49,15 @@ function copyRuntime(opt, r) {
   return { nodePath: nodeDest, serverDir: serverDest, winsw: winsw ? path.join(dest, 'winsw', 'WinSW.exe') : null };
 }
 
+// Moving from "just this computer" to a household server: bring the existing data (and its key) along
+function importData(from, opt, r) {
+  if (!fs.existsSync(path.join(from, 'hearth.db'))) { r.info(`No Hearth data in ${from} to bring across`); return; }
+  if (fs.existsSync(path.join(opt.dataDir, 'hearth.db'))) { r.warn(`${opt.dataDir} already has Hearth data — keeping it, not copying ${from}`); return; }
+  r.step(`Copying your data from ${from}`);
+  if (opt.dryRun) return;
+  fs.cpSync(from, opt.dataDir, { recursive: true, filter: (src) => !/\.(log)$/.test(src) && path.basename(src) !== 'logs' });
+}
+
 function findWinsw(opt) {
   const candidates = [opt.winsw, path.join(path.dirname(opt.nodePath), '..', 'winsw', 'WinSW.exe'), path.join(opt.serverDir, '..', 'winsw', 'WinSW.exe'),
     path.join(path.dirname(opt.nodePath), 'WinSW.exe')].filter(Boolean);
@@ -68,6 +77,7 @@ async function install(o, r) {
   needAdmin(opt);
   if (opt.copyTo) Object.assign(opt, copyRuntime(opt, r));
   if (!opt.dryRun) fs.mkdirSync(opt.dataDir, { recursive: true });
+  if (o.importData && o.importData !== true) importData(path.resolve(o.importData), opt, r);
   const res = await platform().install(opt, r);
   return { ...res, port: opt.port, dataDir: opt.dataDir, scope: opt.scope };
 }

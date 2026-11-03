@@ -7,3 +7,7 @@ dist/
 build/runtime/
 *.log
 .DS_Store
+desktop/build/resources/
+mobile/www/vendor/
+mobile/android/app/build/
+mobile/ios/App/build/

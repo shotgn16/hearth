@@ -1,0 +1,27 @@
+{
+  "name": "hearth-desktop",
+  "productName": "Hearth",
+  "version": "1.5.0",
+  "description": "Hearth household money manager — desktop app and installer",
+  "homepage": "https://github.com/shotgn16/hearth",
+  "author": { "name": "shotgn16", "url": "https://github.com/shotgn16" },
+  "license": "MIT",
+  "main": "src/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "prepare-resources": "node scripts/prepare-resources.mjs",
+    "test": "node --test --test-reporter=spec \"test/**/*.test.js\"",
+    "dist": "npm run prepare-resources && electron-builder",
+    "dist:mac": "npm run prepare-resources -- --platform darwin && electron-builder --mac",
+    "dist:win": "npm run prepare-resources -- --platform win32 --arch x64 && electron-builder --win --x64",
+    "dist:linux": "npm run prepare-resources -- --platform linux && electron-builder --linux"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.10"
+  },
+  "devDependencies": {
+    "electron": "44.10.0",
+    "electron-builder": "26.17.0"
+  }
+}

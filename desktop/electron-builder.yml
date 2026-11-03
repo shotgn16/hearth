@@ -1,0 +1,102 @@
+# Builds the desktop installers. Run "npm run dist" (after "npm run prepare-resources"), or let GitHub Actions do it.
+# Everything Hearth needs is bundled: the Node.js runtime, the server and its packages — nothing to install first.
+appId: com.shotgn16.hearth
+productName: Hearth
+copyright: Copyright © shotgn16 — MIT licence
+artifactName: Hearth-${version}-${os}-${arch}.${ext}
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - src/**/*
+  - package.json
+  - "!**/*.map"
+
+# Bundled by scripts/prepare-resources.mjs into build/resources/<platform>-<arch>
+extraResources:
+  - from: build/resources/${platform}-${arch}/runtime
+    to: runtime
+  - from: build/resources/${platform}-${arch}/server
+    to: server
+  - from: build/resources/${platform}-${arch}/winsw
+    to: winsw
+    filter: ["**/*"]
+
+publish:
+  provider: github
+  owner: shotgn16
+  repo: hearth
+  releaseType: release
+
+protocols:
+  - name: Hearth
+    schemes: [hearth]
+
+mac:
+  category: public.app-category.finance
+  icon: build/icon.png
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # The bundled Node runtime must be signed with the same entitlements (V8 needs JIT)
+  binaries:
+    - Contents/Resources/runtime/node
+  extendInfo:
+    NSLocalNetworkUsageDescription: Hearth finds and serves the Hearth app on your home network so your phone can connect.
+dmg:
+  title: Install Hearth
+  contents:
+    - { x: 150, y: 190 }
+    - { x: 450, y: 190, type: link, path: /Applications }
+  window: { width: 600, height: 400 }
+
+win:
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch: [x64]
+  # Set CSC_LINK / CSC_KEY_PASSWORD (GitHub secrets WIN_CSC_LINK / WIN_CSC_KEY_PASSWORD) to sign; unsigned otherwise
+  signtoolOptions:
+    publisherName: shotgn16
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Hearth
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
+  include: build/installer.nsh
+  license: ../LICENSE
+
+linux:
+  icon: build/icon.png
+  category: Office;Finance
+  executableName: hearth
+  synopsis: Household money manager with local AI
+  description: Hearth — a self-hosted household money manager. Runs on this computer, as a server for your household, in Docker or in Home Assistant.
+  target:
+    - target: AppImage
+      arch: [x64, arm64]
+    - target: deb
+      arch: [x64, arm64]
+    - target: rpm
+      arch: [x64, arm64]
+  desktop:
+    entry:
+      StartupWMClass: Hearth
+      MimeType: x-scheme-handler/hearth;
+deb:
+  depends: [libgtk-3-0, libnotify4, libnss3, libxss1, libxtst6, xdg-utils, libatspi2.0-0, libuuid1, libsecret-1-0]
+  afterRemove: build/linux-after-remove.sh
+rpm:
+  afterRemove: build/linux-after-remove.sh

@@ -24,8 +24,11 @@ class CliError extends Error {}
  * Reporter: prints friendly lines, or JSON lines when --json is used (the desktop app reads those).
  *   r.step('Installing the service')   r.ok('Done')   r.warn('…')   r.result({ url })
  */
-function reporter(json) {
+function reporter(json, logFile) {
+  const fs = require('fs');
   const emit = (type, msg, extra = {}) => {
+    // --log-file: also write JSON lines to a file (the desktop app reads it after an administrator prompt)
+    if (logFile) try { fs.appendFileSync(logFile, `${JSON.stringify({ type, message: msg, ...extra })}\n`); } catch { /* ignore */ }
     if (json) process.stdout.write(`${JSON.stringify({ type, message: msg, ...extra })}\n`);
     else if (type === 'result') { /* printed by the command */ } else {
       const icon = { step: '→', ok: '✓', warn: '!', info: ' ' }[type] || '';
