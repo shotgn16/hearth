@@ -159,7 +159,7 @@ test('users: admin adds, member cannot', async () => {
 });
 
 test('phones & devices: addresses with QR codes', async () => {
-  const r = await h.call('GET', '/api/devices', undefined, { Host: '192.168.1.20:8484' });
+  const r = await h.call('GET', '/api/devices', undefined, { 'X-Forwarded-Host': '192.168.1.20:8484' });
   assert.equal(r.status, 200);
   const first = r.json.addresses[0];
   assert.equal(first.url, 'http://192.168.1.20:8484');
