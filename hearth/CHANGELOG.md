@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.0 — apps and installers
+- **Desktop apps** for macOS, Windows and Linux with everything included — no Node.js or anything else to install. A setup wizard offers: just this computer, this computer and your phone, a household server that starts with the computer, connecting to another Hearth, Docker, or Home Assistant
+- **Phone and tablet app** for iPhone, iPad and Android: connect once by scanning a QR code, then it opens your Hearth straight away; switch between Hearths from the menu
+- **Settings → Phones & devices** shows the addresses and QR codes for connecting phones
+- `hearth-server` command for running Hearth as a service (systemd, launchd, Windows service), installing it in Docker or Home Assistant, and resetting a forgotten password
+- One Docker image (`ghcr.io/shotgn16/hearth`) for Docker and the Home Assistant add-on
+- The server is now made of feature modules that can be added or removed — see the customising guide
+
 ## 1.5.0 — security
 - Encryption at rest (AES-256-GCM) for bank feed access, mailbox passwords, Microsoft sign-in tokens, Home Assistant / ntfy tokens, calendar logins and receipt files; existing data is encrypted automatically on first start. Key kept in `hearth.key` (or `HEARTH_SECRET_KEY`)
 - Sign-ins stored only as hashes; 30-day sliding sign-in; changing a password signs out other devices; **Sign out other devices** button

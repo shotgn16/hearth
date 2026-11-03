@@ -86,6 +86,8 @@ async function uninstall(o, r) {
   const opt = resolveOptions(o);
   if (process.platform === 'win32') opt.scope = 'system';
   needAdmin(opt);
+  // Installed with --copy-to: the service runs the copied runtime (and on Windows its helper sits beside it)
+  if (opt.copyTo) opt.nodePath = path.join(opt.copyTo, 'runtime', path.basename(opt.nodePath));
   await platform().uninstall(opt, r);
   if (opt.copyTo && !opt.dryRun && fs.existsSync(opt.copyTo)) { r.step(`Removing ${opt.copyTo}`); fs.rmSync(opt.copyTo, { recursive: true, force: true }); }
   r.ok(`Service removed. Your data is still in ${opt.dataDir} — delete that folder yourself if you no longer need it.`);

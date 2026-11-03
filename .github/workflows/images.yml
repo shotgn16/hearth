@@ -5,13 +5,12 @@ name: Docker images
 #   ghcr.io/shotgn16/hearth-amd64:<version>           \ the Home Assistant add-on (image: in hearth/config.yaml),
 #   ghcr.io/shotgn16/hearth-aarch64:<version>         / so Home Assistant downloads Hearth instead of building it
 #
-# Pushes to main and version tags publish (skipping versions that already exist). Pull requests and other
+# Pushes to main and releases (release.yml calls this) publish (skipping versions that already exist). Pull requests and other
 # branches only build and test. Can also be run by hand from the Actions tab.
 
 on:
   push:
-    branches: [main]
-    tags: ["v*"]
+    branches: [main, "release/**"]
     paths: ["server/**", "hearth/config.yaml", ".github/workflows/images.yml"]
   pull_request:
     paths: ["server/**", ".github/workflows/images.yml"]
@@ -50,7 +49,7 @@ jobs:
           v=$(node -p "require('./server/package.json').version")
           owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           publish=false
-          if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.publish }}" = "true" ]; then publish=true; fi
+          if [ "${{ github.ref }}" = "refs/heads/main" ] || [ "${{ inputs.publish }}" = "true" ]; then publish=true; fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
           echo "owner=$owner" >> "$GITHUB_OUTPUT"
           echo "publish=$publish" >> "$GITHUB_OUTPUT"

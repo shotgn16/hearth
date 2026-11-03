@@ -1,0 +1,322 @@
+name: Release
+
+# Builds everything people install, tests it, and (for a version tag) puts it in a draft GitHub release:
+#   macOS    Hearth-<v>-mac-arm64.dmg / -mac-x64.dmg  (+ .zip for in-app updates)
+#   Windows  Hearth-<v>-win-x64.exe
+#   Linux    Hearth-<v>-linux-x86_64.AppImage / -arm64.AppImage, .deb, .rpm
+#   Android  Hearth-<v>-android.apk
+#   iPhone & iPad  Hearth-<v>-ios-unsigned.ipa  (sideload) — or a signed .ipa when Apple signing secrets are set
+#   Docker / Home Assistant  ghcr.io/<owner>/hearth (via images.yml)
+#
+# Release:  node tools/set-version.js 1.7.0 → update hearth/CHANGELOG.md → commit → git tag v1.7.0 → git push --tags
+# Test run: Actions tab → Release → Run workflow (builds and tests everything; downloads under "Artifacts")
+#
+# Optional secrets (everything still builds without them — see docs/building.md):
+#   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD   sign the APK with your key
+#   MAC_CSC_LINK, MAC_CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID       sign + notarise for macOS
+#   WIN_CSC_LINK, WIN_CSC_KEY_PASSWORD                                                             sign the Windows installer
+#   IOS_CERTIFICATE_BASE64, IOS_CERTIFICATE_PASSWORD, IOS_PROFILE_BASE64, APPLE_TEAM_ID             signed iPhone/iPad build
+
+on:
+  push:
+    tags: ["v*"]
+    branches: ["release/**"]   # build and test only — nothing is published from a branch
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 22
+
+jobs:
+  # ------------------------------------------------------------------ versions and tests
+  check:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}" }
+      - name: Versions agree
+        id: v
+        run: |
+          node tools/set-version.js --check
+          v=$(node -p "require('./server/package.json').version")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.ref_type }}" = "tag" ] && [ "${{ github.ref_name }}" != "v$v" ]; then
+            echo "::error::Tag ${{ github.ref_name }} doesn't match version $v"; exit 1
+          fi
+      - name: Server tests
+        working-directory: server
+        run: npm ci && npm test
+      - name: Desktop tests
+        working-directory: desktop
+        run: npm ci && npm test
+        env: { ELECTRON_SKIP_BINARY_DOWNLOAD: "1" }
+      - name: Phone app tests
+        working-directory: mobile
+        run: npm ci && npm test
+
+  # ------------------------------------------------------------------ desktop installers
+  desktop:
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-15, platform: darwin, dist: "--mac", node_arch: arm64 }
+          - { os: windows-2025, platform: win32, dist: "--win --x64", node_arch: x64 }
+          - { os: ubuntu-24.04, platform: linux, dist: "--linux", node_arch: x64 }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run: { shell: bash }
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}" }
+      - name: Linux packaging tools
+        if: matrix.platform == 'linux'
+        run: sudo apt-get update -q && sudo apt-get install -yq rpm xvfb
+      - name: Install build tools
+        working-directory: desktop
+        run: npm ci
+      - name: Bundle Node.js runtime and the Hearth server
+        working-directory: desktop
+        run: node scripts/prepare-resources.mjs --platform ${{ matrix.platform }}
+      - name: Build installers
+        working-directory: desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # macOS: signed and notarised when the secrets exist, otherwise ad-hoc signed (see docs/install/macos.md)
+          CSC_LINK: ${{ matrix.platform == 'darwin' && secrets.MAC_CSC_LINK || matrix.platform == 'win32' && secrets.WIN_CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ matrix.platform == 'darwin' && secrets.MAC_CSC_KEY_PASSWORD || matrix.platform == 'win32' && secrets.WIN_CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          extra=""
+          if [ "${{ matrix.platform }}" = "darwin" ]; then
+            if [ -z "$CSC_LINK" ]; then export CSC_IDENTITY_AUTO_DISCOVERY=false; unset CSC_LINK CSC_KEY_PASSWORD; extra="-c.mac.identity=- -c.mac.notarize=false"
+            elif [ -n "$APPLE_ID" ]; then extra="-c.mac.notarize=true"; fi
+          fi
+          [ -z "$CSC_LINK" ] && unset CSC_LINK CSC_KEY_PASSWORD
+          npx electron-builder ${{ matrix.dist }} --publish never $extra
+      - name: Self-test the packaged app
+        working-directory: desktop
+        run: |
+          case "${{ matrix.platform }}" in
+            darwin) app="dist/mac-arm64/Hearth.app/Contents/MacOS/Hearth" ;;
+            win32)  app="dist/win-unpacked/Hearth.exe" ;;
+            linux)  app="xvfb-run -a dist/linux-unpacked/hearth --no-sandbox" ;;
+          esac
+          out=$($app --smoke-test 2>&1 || true); echo "$out" | grep -v -i "dbus\|gpu" | tail -5
+          echo "$out" | grep -q "SMOKE OK"
+      - name: Check the macOS app is signed
+        if: matrix.platform == 'darwin'
+        working-directory: desktop
+        run: |
+          for a in dist/mac-arm64/Hearth.app dist/mac/Hearth.app; do
+            [ -d "$a" ] || continue
+            codesign --verify --deep --strict "$a" && echo "$a: signature OK"
+            codesign --verify "$a/Contents/Resources/runtime/node" && echo "bundled Node.js: signature OK"
+          done
+      # The "household server" setup, for real: install Hearth as a system service from the bundled files,
+      # check it answers, then remove it again.
+      - name: Household server — install, check, remove
+        working-directory: desktop
+        run: |
+          res="build/resources/${{ matrix.platform }}-${{ matrix.node_arch }}"
+          node="$res/runtime/node"; [ "${{ matrix.platform }}" = "win32" ] && node="$res/runtime/node.exe"
+          cli="$res/server/bin/hearth-server.js"
+          data="$RUNNER_TEMP/hearth-service-data"; dest="$RUNNER_TEMP/hearth-server"
+          args=(service install --scope system --port 18484 --host 127.0.0.1 --data "$data" --copy-to "$dest" --timezone UTC)
+          case "${{ matrix.platform }}" in
+            win32)  "$node" "$cli" "${args[@]}" --winsw "$res/winsw/WinSW.exe" ;;
+            darwin) sudo "$node" "$cli" "${args[@]}" --user "$(whoami)" ;;
+            linux)  sudo "$node" "$cli" "${args[@]}" ;;
+          esac
+          ok=0; for i in $(seq 1 45); do if curl -fs http://127.0.0.1:18484/api/status; then ok=1; break; fi; sleep 2; done
+          echo
+          sudo_=""; [ "${{ matrix.platform }}" != "win32" ] && sudo_="sudo"
+          $sudo_ "$node" "$cli" service status --copy-to "$dest" --data "$data" || true
+          if [ $ok != 1 ]; then
+            ls -la "$data" "$data/logs" 2>/dev/null; cat "$data"/logs/* 2>/dev/null | tail -40
+            [ "${{ matrix.platform }}" = "linux" ] && sudo journalctl -u hearth --no-pager | tail -40
+            [ "${{ matrix.platform }}" = "darwin" ] && sudo tail -40 /Library/Logs/Hearth/*.log 2>/dev/null
+            exit 1
+          fi
+          $sudo_ "$node" "$cli" service uninstall --copy-to "$dest" --data "$data"
+          sleep 3; if curl -fs http://127.0.0.1:18484/api/status; then echo "::error::still running after uninstall"; exit 1; fi
+          echo "Service install and uninstall OK"
+      - name: Collect installers
+        run: |
+          mkdir -p out
+          cd desktop/dist
+          for f in *.dmg *.zip *.exe *.AppImage *.deb *.rpm *.blockmap latest*.yml; do [ -f "$f" ] && cp "$f" ../../out/; done
+          ls -la ../../out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}
+          path: out/*
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------ Android
+  android:
+    needs: check
+    runs-on: ubuntu-24.04
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}" }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21" }
+      - name: Prepare the app
+        working-directory: mobile
+        run: npm ci && npm run sync -- android
+      - name: Signing key
+        id: key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          ks="$RUNNER_TEMP/hearth.jks"
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$ks"
+            { echo "ANDROID_KEYSTORE=$ks"; echo "ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"; echo "ANDROID_KEY_ALIAS=${KEY_ALIAS:-hearth}"; echo "ANDROID_KEY_PASSWORD=${KEY_PASSWORD:-$KEYSTORE_PASSWORD}"; } >> "$GITHUB_ENV"
+          else
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret — signing with a temporary key. Phones can install this APK, but a later APK signed with a different key can't update it. See docs/building.md."
+            pw=$(openssl rand -hex 16)
+            keytool -genkeypair -keystore "$ks" -storepass "$pw" -keypass "$pw" -alias hearth -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=Hearth (temporary build key)" >/dev/null
+            { echo "ANDROID_KEYSTORE=$ks"; echo "ANDROID_KEYSTORE_PASSWORD=$pw"; echo "ANDROID_KEY_ALIAS=hearth"; echo "ANDROID_KEY_PASSWORD=$pw"; } >> "$GITHUB_ENV"
+          fi
+      - name: Build the APK
+        working-directory: mobile/android
+        run: ./gradlew --no-daemon assembleRelease
+      - name: Check the APK
+        run: |
+          apk=mobile/android/app/build/outputs/apk/release/app-release.apk
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$bt/apksigner" verify --print-certs "$apk" | head -3
+          "$bt/aapt2" dump badging "$apk" | grep -E "^package:|uses-permission|application-label:" | head
+          "$bt/aapt2" dump badging "$apk" | grep -q "versionName='$VERSION'"
+          unzip -l "$apk" | grep -q "assets/public/index.html"
+          mkdir -p out && cp "$apk" "out/Hearth-$VERSION-android.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: out/*.apk
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------ iPhone and iPad
+  ios:
+    needs: check
+    runs-on: macos-15
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}" }
+      - name: Prepare the app
+        working-directory: mobile
+        run: npm ci && npm run sync -- ios
+      - name: Build (unsigned, for sideloading)
+        working-directory: mobile/ios/App
+        run: |
+          xcodebuild -project App.xcodeproj -scheme App -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build | tail -20
+          app=build/Build/Products/Release-iphoneos/App.app
+          test -f "$app/App"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$app/Info.plist" | grep -qx "$VERSION"
+          test -f "$app/public/index.html"
+          mkdir -p Payload && cp -R "$app" Payload/ && mkdir -p ../../../out
+          zip -qry "../../../out/Hearth-$VERSION-ios-unsigned.ipa" Payload
+      - name: Build (signed) — only with Apple signing secrets
+        if: env.IOS_CERTIFICATE_BASE64 != ''
+        working-directory: mobile/ios/App
+        env:
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROFILE_BASE64: ${{ secrets.IOS_PROFILE_BASE64 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          kc="$RUNNER_TEMP/hearth.keychain-db"; kp=$(openssl rand -hex 12)
+          security create-keychain -p "$kp" "$kc" && security set-keychain-settings -lut 3600 "$kc" && security unlock-keychain -p "$kp" "$kc"
+          echo "$IOS_CERTIFICATE_BASE64" | base64 -d > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -P "$IOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$kc"
+          security list-keychain -d user -s "$kc"
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "$IOS_PROFILE_BASE64" | base64 -d > ~/Library/MobileDevice/Provisioning\ Profiles/hearth.mobileprovision
+          uuid=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/hearth.mobileprovision | plutil -extract UUID raw -)
+          method=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/hearth.mobileprovision | plutil -extract ProvisionsAllDevices raw - 2>/dev/null | grep -q true && echo enterprise || echo release-testing)
+          xcodebuild -project App.xcodeproj -scheme App -configuration Release -archivePath build/Hearth.xcarchive \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE="$uuid" CODE_SIGN_IDENTITY="Apple Distribution" archive | tail -5
+          cat > export.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict><key>method</key><string>$method</string><key>teamID</key><string>$APPLE_TEAM_ID</string>
+          <key>signingStyle</key><string>manual</string><key>provisioningProfiles</key><dict><key>com.shotgn16.hearth</key><string>$uuid</string></dict></dict></plist>
+          EOF
+          xcodebuild -exportArchive -archivePath build/Hearth.xcarchive -exportOptionsPlist export.plist -exportPath build/export
+          cp build/export/*.ipa "../../../out/Hearth-$VERSION-ios.ipa"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios
+          path: out/*.ipa
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------ Docker / Home Assistant images (tags only)
+  images:
+    needs: check
+    if: github.ref_type == 'tag'
+    uses: ./.github/workflows/images.yml
+    with:
+      publish: true
+    secrets: inherit
+
+  # ------------------------------------------------------------------ draft release (tags only)
+  release:
+    needs: [check, desktop, android, ios]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: artifacts, merge-multiple: true }
+      - name: Release notes from the changelog
+        run: |
+          v="${{ needs.check.outputs.version }}"
+          awk -v v="$v" '$0 ~ "^## "v {on=1; next} /^## / && on {exit} on' hearth/CHANGELOG.md > notes.md
+          cat >> notes.md <<'EOF'
+
+          ### Which file do I need?
+          | | |
+          |---|---|
+          | **Mac** (Apple silicon: M1–M4) | `Hearth-…-mac-arm64.dmg` |
+          | **Mac** (Intel) | `Hearth-…-mac-x64.dmg` |
+          | **Windows** | `Hearth-…-win-x64.exe` |
+          | **Linux** | `.deb` (Ubuntu, Debian, Mint), `.rpm` (Fedora, openSUSE) or `.AppImage` (any) |
+          | **Android** phone or tablet | `Hearth-…-android.apk` |
+          | **iPhone / iPad** | `Hearth-…-ios-unsigned.ipa` — see the [phone app guide](https://github.com/shotgn16/hearth/blob/main/docs/install/phones-and-tablets.md) |
+          | **Docker** | `docker pull ghcr.io/shotgn16/hearth:latest` |
+          | **Home Assistant** | add this repository in the add-on store |
+
+          Step-by-step guides: [Installing Hearth](https://github.com/shotgn16/hearth/blob/main/docs/install/README.md)
+          EOF
+      - name: Create draft release
+        env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+        run: |
+          ls -la artifacts
+          gh release create "${{ github.ref_name }}" artifacts/* --draft --title "Hearth ${{ needs.check.outputs.version }}" --notes-file notes.md
