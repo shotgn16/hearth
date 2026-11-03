@@ -31,6 +31,9 @@ document.addEventListener('click', (e) => {
 const app = $('#app');
 // Inside Home Assistant's ingress panel the URL is session-specific, so skip the offline service worker there
 export const inIngress = /\/api\/hassio_ingress\//.test(document.baseURI);
+// Inside the Hearth phone app (its web view adds "HearthApp" to the user agent): offer to switch servers
+const inApp = /HearthApp/.test(navigator.userAgent);
+const appOrigin = /iPhone|iPad|Macintosh/.test(navigator.userAgent) ? 'capacitor://localhost' : 'http://localhost';
 if ('serviceWorker' in navigator && !inIngress) navigator.serviceWorker.register('sw.js').catch(() => {});
 try { const th = localStorage.getItem('hl_theme'); if (th) document.documentElement.dataset.theme = th; } catch {}
 
@@ -172,9 +175,10 @@ async function notificationsSheet() {
 function meSheet() {
   const { el, close } = sheet(`<h2>${esc(state.me.user.name)}</h2><p class="muted">${esc(state.me.user.email)} · ${esc(state.me.household.name)}</p>
     <div class="row">
-    <button class="btn soft" data-a="theme">Light / dark</button><a class="btn soft" href="#/settings" data-close>Settings</a></div>
+    <button class="btn soft" data-a="theme">Light / dark</button><a class="btn soft" href="#/settings" data-close>Settings</a>${inApp ? '<button class="btn soft" data-a="switch">Switch server</button>' : ''}</div>
     <div class="row end" style="margin-top:18px"><button class="btn ghost" data-a="out">Sign out</button></div>`);
   on(el, 'click', '[data-a]', async (e, b) => {
+    if (b.dataset.a === 'switch') { location.href = `${appOrigin}/index.html?switch=1`; return; }
     if (b.dataset.a === 'out') { await api('/logout', { method: 'POST' }).catch(() => {}); setToken(null); location.reload(); }
     if (b.dataset.a === 'theme') {
       const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
@@ -202,11 +206,18 @@ async function authScreen() {
       <button class="btn" style="width:100%">${needsSetup ? 'Create household' : 'Sign in'}</button></form></div>`;
   $('#af').onsubmit = async (e) => {
     e.preventDefault();
+    const btn = e.target.querySelector('button'); const label = btn.textContent;
+    if (btn.disabled) return; // one press is enough — a second "Create household" would be refused
+    btn.disabled = true; btn.textContent = needsSetup ? 'Creating your household…' : 'Signing in…';
     try {
       const body = Object.fromEntries(new FormData(e.target));
       const { token: t } = await api(needsSetup ? '/setup' : '/login', { method: 'POST', body });
       setToken(t); boot();
-    } catch (err) { fail(err); }
+    } catch (err) {
+      // Someone else finished setting up in the meantime (another tab or device): show the sign-in form instead
+      if (needsSetup && /already set up/i.test(err.message)) { toast('Hearth is already set up — sign in with your account'); return authScreen(); }
+      fail(err); btn.disabled = false; btn.textContent = label;
+    }
   };
 }
 

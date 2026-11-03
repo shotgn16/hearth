@@ -1,7 +1,7 @@
 // Service worker (standalone installs only): the app shell loads offline. Your financial data is never cached on the device.
-const SHELL = 'hearth-shell-v5';
+const SHELL = 'hearth-shell-v6';
 const SHELL_FILES = ['./', 'styles.css', 'icon.svg', 'manifest.webmanifest', 'js/app.js', 'js/core.js', 'js/charts.js',
-  'js/home.js', 'js/money.js', 'js/plan.js', 'js/insights.js', 'js/more.js', 'js/settings.js', 'js/ask.js', 'js/subs.js', 'js/expenses.js', 'js/receipts.js'];
+  'js/home.js', 'js/money.js', 'js/plan.js', 'js/insights.js', 'js/more.js', 'js/settings.js', 'js/ask.js', 'js/subs.js', 'js/expenses.js', 'js/receipts.js', 'js/devices.js'];
 const ASSETS = SHELL_FILES.map((f) => new URL(f, self.registration.scope).href);
 
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(SHELL).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())); });

@@ -1,8 +1,10 @@
 import { state, api, esc, fmt, niceDate, relDay, sheet, toast, fail, on, opts, icons, loadRefs, token, iso } from './core.js';
+import { renderDevices } from './devices.js';
 
 const SECTIONS = [
   ['people', 'People & household', 'Add your partner or family, and people you spend on'],
-  ['banks', 'Bank connections', 'superFin / SimpleFIN and other bank feeds'],
+  ['devices', 'Phones & devices', 'Use Hearth on your phone and other computers'],
+  ['banks', 'Bank connections', 'Synci, superFin, SimpleFIN and other bank feeds'],
   ['import', 'Import statements', 'CSV, OFX or QIF files from any bank — years of history'],
   ['categories', 'Categories & tags', 'Names, colours and icons'],
   ['workflows', 'Workflows', 'When this happens, do that — automatically'],
@@ -21,7 +23,7 @@ export async function renderSettings(el, parts) {
     return;
   }
   document.querySelector('.topbar h1').textContent = SECTIONS.find((x) => x[0] === s)?.[1] || 'Settings';
-  return ({ email: emailSettings, people, banks, import: importer, categories, workflows, calendars, integrations, data, ai: aiSettings, app: appSettings })[s]?.(el);
+  return ({ devices: renderDevices, email: emailSettings, people, banks, import: importer, categories, workflows, calendars, integrations, data, ai: aiSettings, app: appSettings })[s]?.(el);
 }
 
 // ---------- people ----------

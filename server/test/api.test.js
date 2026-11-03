@@ -158,6 +158,15 @@ test('users: admin adds, member cannot', async () => {
   assert.equal(res.status, 403);
 });
 
+test('phones & devices: addresses with QR codes', async () => {
+  const r = await h.call('GET', '/api/devices', undefined, { Host: '192.168.1.20:8484' });
+  assert.equal(r.status, 200);
+  const first = r.json.addresses[0];
+  assert.equal(first.url, 'http://192.168.1.20:8484');
+  assert.match(first.deep_link, /^hearth:\/\/connect\?url=http%3A%2F%2F192\.168\.1\.20%3A8484$/);
+  assert.match(first.qr_app, /^<svg/);
+});
+
 test('sign out ends the session', async () => {
   assert.equal((await h.call('POST', '/api/logout', {})).status, 200);
   assert.equal((await h.call('GET', '/api/me')).status, 401);

@@ -28,4 +28,5 @@ module.exports = [
   require('./settings'),
   require('./homeassistant'),
   require('./backup'),
+  require('./devices'),
 ];
