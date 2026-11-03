@@ -35,7 +35,7 @@ export async function renderDevices(el) {
         <h3 style="margin-top:0">1. Get the app</h3>
         <ul class="small" style="padding-left:18px;line-height:1.7;margin:0 0 10px">
           <li><b>Android</b> — download <code>Hearth.apk</code> from the <a href="${esc(d.downloads)}" target="_blank" rel="noopener">downloads page</a> on your phone and open it.</li>
-          <li><b>iPhone / iPad</b> — see the <a href="https://github.com/shotgn16/hearth/blob/main/docs/mobile-apps.md" target="_blank" rel="noopener">phone app guide</a>.</li>
+          <li><b>iPhone / iPad</b> — see the <a href="https://github.com/shotgn16/hearth/blob/main/docs/install/phones-and-tablets.md" target="_blank" rel="noopener">phone app guide</a>.</li>
           <li><b>No app?</b> Hearth also works in the phone's browser — switch the code below to <i>browser</i>.</li>
         </ul>
         <h3>2. Connect</h3>

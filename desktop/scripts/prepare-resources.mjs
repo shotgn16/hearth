@@ -8,7 +8,7 @@
 //   node scripts/prepare-resources.mjs --platform win32 --arch x64
 //   node scripts/prepare-resources.mjs --local-node            use the Node.js running this script (quick local test)
 //
-// Environment: NODE_VERSION (default: newest 22.x), NODE_MIRROR (default https://nodejs.org/dist)
+// Environment: HEARTH_NODE_VERSION (default: newest 22.x), NODE_MIRROR (default https://nodejs.org/dist)
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -56,7 +56,7 @@ async function download(url, dest) {
 
 // ---------------------------------------------------------------- Node.js runtime
 async function nodeVersion() {
-  if (process.env.NODE_VERSION) return process.env.NODE_VERSION.replace(/^v/, '');
+  if (process.env.HEARTH_NODE_VERSION) return process.env.HEARTH_NODE_VERSION.replace(/^v/, '');
   const list = await (await fetch(`${MIRROR}/index.json`)).json();
   return list.find((r) => r.version.startsWith(`v${NODE_MAJOR}.`)).version.slice(1);
 }
@@ -106,6 +106,29 @@ function stageServer() {
   return staged;
 }
 
+// ---------------------------------------------------------------- the stand-alone server download
+// The same folder doubles as "Hearth Server" for computers without a screen: unpack it and run ./hearth-server
+function writeLaunchers(dir, plat) {
+  if (plat === 'win32') {
+    fs.writeFileSync(path.join(dir, 'hearth-server.cmd'), '@echo off\r\n"%~dp0runtime\\node.exe" "%~dp0server\\bin\\hearth-server.js" %*\r\n');
+  } else {
+    fs.writeFileSync(path.join(dir, 'hearth-server'), '#!/bin/sh\n# Hearth server — see README.txt\nhere=$(cd "$(dirname "$0")" && pwd)\nexec "$here/runtime/node" "$here/server/bin/hearth-server.js" "$@"\n', { mode: 0o755 });
+  }
+  const run = plat === 'win32' ? 'hearth-server' : './hearth-server';
+  const folder = plat === 'win32' ? 'C:\\Program Files\\Hearth Server' : '/opt/hearth-server';
+  fs.writeFileSync(path.join(dir, 'README.txt'), `Hearth Server — everything needed to run Hearth, with no desktop app.
+Includes its own Node.js runtime: nothing else to install.
+
+Try it:              ${run} start            then open http://<this computer>:8484
+Start with the computer (as administrator${plat === 'win32' ? '' : ' / with sudo'}):
+                     ${run} service install
+Everything else:     ${run} help
+
+Keep this folder where it is once the service is installed (for example ${folder}).
+Guide: https://github.com/shotgn16/hearth/blob/main/docs/install/server-only.md
+`.replace(/\n/g, plat === 'win32' ? '\r\n' : '\n'));
+}
+
 // ---------------------------------------------------------------- main
 const version = localNode ? process.version.slice(1) : await nodeVersion();
 if (Number(version.split('.')[0]) < NODE_MAJOR) throw new Error(`Node.js ${version} is too old — Hearth needs ${NODE_MAJOR}.13 or newer`);
@@ -123,5 +146,6 @@ for (const arch of archs) {
     fs.copyFileSync(exe, path.join(dir, 'winsw', 'WinSW.exe'));
     fs.writeFileSync(path.join(dir, 'winsw', 'LICENSE.txt'), `WinSW ${WINSW.version} — MIT licence — https://github.com/winsw/winsw\n`);
   }
+  writeLaunchers(dir, platform);
   log(`Ready: ${path.relative(DESKTOP, dir)}`);
 }

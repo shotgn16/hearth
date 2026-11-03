@@ -43,6 +43,9 @@ function copyRuntime(opt, r) {
   fs.rmSync(serverDest, { recursive: true, force: true });
   const skip = new Set(['data', 'demo-data', 'test', '.git']);
   fs.cpSync(opt.serverDir, serverDest, { recursive: true, filter: (src) => !skip.has(path.relative(opt.serverDir, src).split(path.sep)[0]) });
+  // A "hearth-server" command beside it, for managing the service later (see docs/install)
+  if (process.platform === 'win32') fs.writeFileSync(path.join(dest, 'hearth-server.cmd'), '@echo off\r\n"%~dp0runtime\\node.exe" "%~dp0server\\bin\\hearth-server.js" %*\r\n');
+  else fs.writeFileSync(path.join(dest, 'hearth-server'), '#!/bin/sh\nhere=$(cd "$(dirname "$0")" && pwd)\nexec "$here/runtime/node" "$here/server/bin/hearth-server.js" "$@"\n', { mode: 0o755 });
   // WinSW (Windows) travels with the runtime
   const winsw = findWinsw(opt);
   if (winsw) { fs.mkdirSync(path.join(dest, 'winsw'), { recursive: true }); fs.copyFileSync(winsw, path.join(dest, 'winsw', 'WinSW.exe')); }

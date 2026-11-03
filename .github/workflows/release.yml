@@ -138,6 +138,8 @@ jobs:
           node="$res/runtime/node"; [ "${{ matrix.platform }}" = "win32" ] && node="$res/runtime/node.exe"
           cli="$res/server/bin/hearth-server.js"
           data="$RUNNER_TEMP/hearth-service-data"; dest="$RUNNER_TEMP/hearth-server"
+          # Linux runs the service as its own "hearth" account, which can't read the runner's home — use the real places
+          [ "${{ matrix.platform }}" = "linux" ] && data=/var/lib/hearth-ci && dest=/opt/hearth-ci
           args=(service install --scope system --port 18484 --host 127.0.0.1 --data "$data" --copy-to "$dest" --timezone UTC)
           case "${{ matrix.platform }}" in
             win32)  "$node" "$cli" "${args[@]}" --winsw "$res/winsw/WinSW.exe" ;;
@@ -162,7 +164,17 @@ jobs:
           mkdir -p out
           cd desktop/dist
           for f in *.dmg *.zip *.exe *.AppImage *.deb *.rpm *.blockmap latest*.yml; do [ -f "$f" ] && cp "$f" ../../out/; done
-          ls -la ../../out
+          # Hearth Server: the same runtime + server without the desktop app, for computers without a screen
+          cd ../build/resources
+          os=$(echo "${{ matrix.platform }}" | sed 's/darwin/mac/; s/win32/win/')
+          for d in ${{ matrix.platform }}-*; do
+            arch=${d#*-}; name="Hearth-Server-$VERSION-$os-$arch"
+            rm -rf "$name" && cp -R "$d" "$name" && rm -rf "$name/winsw"
+            if [ "${{ matrix.platform }}" = "win32" ]; then mkdir -p "$name/winsw" && cp "$d/winsw/"* "$name/winsw/"; 7z a -tzip -bd "../../../out/$name.zip" "$name" >/dev/null
+            else tar -czf "../../../out/$name.tar.gz" "$name"; fi
+            rm -rf "$name"
+          done
+          ls -la ../../../out
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.platform }}
