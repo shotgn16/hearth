@@ -9,13 +9,13 @@ Prefer containers? Use [Docker](../standalone-docker.md) instead.
 ## Linux
 
 ```bash
-# 1. Download (use -linux-arm64 for ARM, e.g. Raspberry Pi 4/5)
+# 1. Download (use -Linux-arm64 for ARM, e.g. Raspberry Pi 4/5)
 cd /tmp
-curl -LO https://github.com/shotgn16/hearth/releases/latest/download/Hearth-Server-<version>-linux-x64.tar.gz
+curl -LO https://github.com/shotgn16/hearth/releases/latest/download/Hearth-Server-<version>-Linux-x64.tar.gz
 
 # 2. Unpack into /opt
-sudo tar -xzf Hearth-Server-*-linux-x64.tar.gz -C /opt
-sudo mv /opt/Hearth-Server-*-linux-x64 /opt/hearth-server
+sudo tar -xzf Hearth-Server-*-Linux-x64.tar.gz -C /opt
+sudo mv /opt/Hearth-Server-*-Linux-x64 /opt/hearth-server
 
 # 3. Install the service: starts at boot, runs as its own "hearth" account, data in /var/lib/hearth
 sudo /opt/hearth-server/hearth-server service install
@@ -39,8 +39,8 @@ Needs systemd (Ubuntu, Debian, Raspberry Pi OS, Fedora and most others). If `ufw
 
 ```bash
 cd ~/Downloads
-tar -xzf Hearth-Server-*-mac-arm64.tar.gz          # Intel Macs: -mac-x64
-sudo mv Hearth-Server-*-mac-arm64 /usr/local/hearth-server
+tar -xzf Hearth-Server-*-macOS-arm64.tar.gz          # Intel Macs: -macOS-x64
+sudo mv Hearth-Server-*-macOS-arm64 /usr/local/hearth-server
 xattr -dr com.apple.quarantine /usr/local/hearth-server
 sudo /usr/local/hearth-server/hearth-server service install --user "$(whoami)"
 ```
@@ -49,7 +49,7 @@ It starts when the Mac starts, even before anyone logs in. Data is in `/Library/
 
 ## Windows
 
-1. Download `Hearth-Server-<version>-win-x64.zip` and extract it to `C:\Program Files\Hearth Server`.
+1. Download `Hearth-Server-<version>-Windows-x64.zip` and extract it to `C:\Program Files\Hearth Server`.
 2. Open **Terminal (Admin)** and run:
 
 ```powershell

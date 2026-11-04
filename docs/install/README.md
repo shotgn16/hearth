@@ -27,15 +27,15 @@ Everything is on the [downloads page](https://github.com/shotgn16/hearth/release
 
 | For | File |
 |---|---|
-| Mac with Apple silicon (M1, M2, M3, M4…) | `Hearth-<version>-mac-arm64.dmg` |
-| Mac with an Intel processor | `Hearth-<version>-mac-x64.dmg` |
-| Windows 10 or 11 | `Hearth-<version>-win-x64.exe` |
-| Ubuntu, Debian, Linux Mint, Pop!_OS | `Hearth-<version>-linux-amd64.deb` (or `-arm64.deb`) |
-| Fedora, openSUSE, RHEL | `Hearth-<version>-linux-x86_64.rpm` (or `-aarch64.rpm`) |
-| Any other Linux | `Hearth-<version>-linux-x86_64.AppImage` (or `-arm64.AppImage`) |
-| A server without a desktop | `Hearth-Server-<version>-linux-x64.tar.gz` (also for Mac and Windows) |
-| Android phone or tablet | `Hearth-<version>-android.apk` |
-| iPhone or iPad | `Hearth-<version>-ios-unsigned.ipa` — see [Phones & tablets](phones-and-tablets.md) |
+| Mac with Apple silicon (M1, M2, M3, M4…) | `Hearth-<version>-macOS-AppleSilicon.dmg` |
+| Mac with an Intel processor | `Hearth-<version>-macOS-Intel.dmg` |
+| Windows 10 or 11 | `Hearth-<version>-Windows-x64-Setup.exe` |
+| Ubuntu, Debian, Linux Mint, Pop!_OS | `Hearth-<version>-Linux-amd64.deb` (or `-arm64.deb`) |
+| Fedora, openSUSE, RHEL | `Hearth-<version>-Linux-x86_64.rpm` (or `-aarch64.rpm`) |
+| Any other Linux | `Hearth-<version>-Linux-x86_64.AppImage` (or `-arm64.AppImage`) |
+| A server without a desktop | `Hearth-Server-<version>-Linux-x64.tar.gz` (also for Mac and Windows) |
+| Android phone or tablet | `Hearth-<version>-Android.apk` |
+| iPhone or iPad | `Hearth-<version>-iPhone-iPad-unsigned.ipa` — see [Phones & tablets](phones-and-tablets.md) |
 
 Not sure which Mac you have? Choose  → **About This Mac**. "Chip: Apple M…" means Apple silicon; "Processor: Intel" means Intel.
 

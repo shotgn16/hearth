@@ -1,15 +1,20 @@
 name: Release
 
 # Builds everything people install, tests it, and (for a version tag) puts it in a draft GitHub release:
-#   macOS    Hearth-<v>-mac-arm64.dmg / -mac-x64.dmg  (+ .zip for in-app updates)
-#   Windows  Hearth-<v>-win-x64.exe
-#   Linux    Hearth-<v>-linux-x86_64.AppImage / -arm64.AppImage, .deb, .rpm
-#   Android  Hearth-<v>-android.apk
-#   iPhone & iPad  Hearth-<v>-ios-unsigned.ipa  (sideload) — or a signed .ipa when Apple signing secrets are set
+#   macOS    Hearth-<v>-macOS-AppleSilicon.dmg / -macOS-Intel.dmg  (+ -macOS-arm64.zip / -x64.zip for in-app updates)
+#   Windows  Hearth-<v>-Windows-x64-Setup.exe
+#   Linux    Hearth-<v>-Linux-amd64.deb / -arm64.deb, -x86_64.rpm / -aarch64.rpm, -x86_64.AppImage / -arm64.AppImage
+#   Servers  Hearth-Server-<v>-Linux-x64.tar.gz (and -Linux-arm64, -macOS-arm64, -macOS-x64 .tar.gz, -Windows-x64.zip)
+#   Android  Hearth-<v>-Android.apk
+#   iPhone & iPad  Hearth-<v>-iPhone-iPad-unsigned.ipa  (sideload) — or a signed …-iPhone-iPad.ipa when Apple signing secrets are set
 #   Docker / Home Assistant  ghcr.io/<owner>/hearth (via images.yml)
+#   SHA256SUMS.txt
 #
-# Release:  node tools/set-version.js 1.7.0 → update hearth/CHANGELOG.md → commit → git tag v1.7.0 → git push --tags
-# Test run: Actions tab → Release → Run workflow (builds and tests everything; downloads under "Artifacts")
+# Release (published straight away and marked Latest; notes come from CHANGELOG.md):
+#   node tools/set-version.js 1.7.0 → add a "## [1.7.0]" section to CHANGELOG.md (and hearth/CHANGELOG.md) → commit
+#   → git tag v1.7.0 && git push --tags
+#   or Actions → Release → Run workflow with a version (e.g. 1.7.0): it creates the v<version> tag itself.
+# Test run: push to a release/** branch, or Run workflow without a version (downloads under "Artifacts")
 #
 # Optional secrets (everything still builds without them — see docs/building.md):
 #   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD   sign the APK with your key
@@ -22,6 +27,10 @@ on:
     tags: ["v*"]
     branches: ["release/**"]   # build and test only — nothing is published from a branch
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. 1.7.0 (creates the tag). Leave empty to build and test only."
+        required: false
 
 permissions:
   contents: write
@@ -40,6 +49,7 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.v.outputs.version }}
+      publish: ${{ steps.v.outputs.publish }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -50,8 +60,14 @@ jobs:
           node tools/set-version.js --check
           v=$(node -p "require('./server/package.json').version")
           echo "version=$v" >> "$GITHUB_OUTPUT"
-          if [ "${{ github.ref_type }}" = "tag" ] && [ "${{ github.ref_name }}" != "v$v" ]; then
-            echo "::error::Tag ${{ github.ref_name }} doesn't match version $v"; exit 1
+          want="${{ inputs.version }}"; want="${want#v}"
+          if [ "${{ github.ref_type }}" = "tag" ]; then want="${GITHUB_REF_NAME#v}"; fi
+          if [ -n "$want" ]; then
+            [ "$want" = "$v" ] || { echo "::error::Release v$want doesn't match the version in the code ($v) — run node tools/set-version.js $want first"; exit 1; }
+            grep -q "^## \[$v\]" CHANGELOG.md || { echo "::error::CHANGELOG.md has no '## [$v]' section"; exit 1; }
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
           fi
       - name: Server tests
         working-directory: server
@@ -166,7 +182,7 @@ jobs:
           for f in *.dmg *.zip *.exe *.AppImage *.deb *.rpm *.blockmap latest*.yml; do [ -f "$f" ] && cp "$f" ../../out/; done
           # Hearth Server: the same runtime + server without the desktop app, for computers without a screen
           cd ../build/resources
-          os=$(echo "${{ matrix.platform }}" | sed 's/darwin/mac/; s/win32/win/')
+          os=$(echo "${{ matrix.platform }}" | sed 's/darwin/macOS/; s/win32/Windows/; s/linux/Linux/')
           for d in ${{ matrix.platform }}-*; do
             arch=${d#*-}; name="Hearth-Server-$VERSION-$os-$arch"
             rm -rf "$name" && cp -R "$d" "$name" && rm -rf "$name/winsw"
@@ -225,7 +241,7 @@ jobs:
           "$bt/aapt2" dump badging "$apk" | grep -E "^package:|uses-permission|application-label:" | head
           "$bt/aapt2" dump badging "$apk" | grep -q "versionName='$VERSION'"
           unzip -l "$apk" | grep -q "assets/public/index.html"
-          mkdir -p out && cp "$apk" "out/Hearth-$VERSION-android.apk"
+          mkdir -p out && cp "$apk" "out/Hearth-$VERSION-Android.apk"
       - uses: actions/upload-artifact@v4
         with:
           name: android
@@ -256,7 +272,7 @@ jobs:
           /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$app/Info.plist" | grep -qx "$VERSION"
           test -f "$app/public/index.html"
           mkdir -p Payload && cp -R "$app" Payload/ && mkdir -p ../../../out
-          zip -qry "../../../out/Hearth-$VERSION-ios-unsigned.ipa" Payload
+          zip -qry "../../../out/Hearth-$VERSION-iPhone-iPad-unsigned.ipa" Payload
       - name: Build (signed) — only with Apple signing secrets
         if: env.IOS_CERTIFICATE_BASE64 != ''
         working-directory: mobile/ios/App
@@ -282,53 +298,86 @@ jobs:
           <key>signingStyle</key><string>manual</string><key>provisioningProfiles</key><dict><key>com.shotgn16.hearth</key><string>$uuid</string></dict></dict></plist>
           EOF
           xcodebuild -exportArchive -archivePath build/Hearth.xcarchive -exportOptionsPlist export.plist -exportPath build/export
-          cp build/export/*.ipa "../../../out/Hearth-$VERSION-ios.ipa"
+          cp build/export/*.ipa "../../../out/Hearth-$VERSION-iPhone-iPad.ipa"
       - uses: actions/upload-artifact@v4
         with:
           name: ios
           path: out/*.ipa
           if-no-files-found: error
 
-  # ------------------------------------------------------------------ Docker / Home Assistant images (tags only)
+  # ------------------------------------------------------------------ Docker / Home Assistant images (releases only)
   images:
     needs: check
-    if: github.ref_type == 'tag'
+    if: needs.check.outputs.publish == 'true'
     uses: ./.github/workflows/images.yml
     with:
       publish: true
     secrets: inherit
 
-  # ------------------------------------------------------------------ draft release (tags only)
+  # ------------------------------------------------------------------ GitHub release (version tag, or Run workflow with a version)
   release:
-    needs: [check, desktop, android, ios]
-    if: github.ref_type == 'tag'
+    needs: [check, desktop, android, ios, images]
+    if: ${{ !cancelled() && needs.check.outputs.publish == 'true' && needs.desktop.result == 'success' && needs.android.result == 'success' && needs.ios.result == 'success' }}
     runs-on: ubuntu-24.04
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with: { path: artifacts, merge-multiple: true }
-      - name: Release notes from the changelog
+      - name: Collect files
         run: |
-          v="${{ needs.check.outputs.version }}"
-          awk -v v="$v" '$0 ~ "^## "v {on=1; next} /^## / && on {exit} on' hearth/CHANGELOG.md > notes.md
-          cat >> notes.md <<'EOF'
+          mkdir -p files && cp artifacts/* files/ && cd files
+          # Friendly names for the Mac disk images (the .zip files keep arm64/x64: the in-app updater looks for them)
+          for a in arm64:AppleSilicon x64:Intel; do
+            from="Hearth-$VERSION-macOS-${a%%:*}.dmg"; to="Hearth-$VERSION-macOS-${a#*:}.dmg"
+            [ -f "$from" ] || { echo "::error::$from is missing"; exit 1; }
+            mv "$from" "$to"; [ -f "$from.blockmap" ] && mv "$from.blockmap" "$to.blockmap"
+            sed -i "s/$from/$to/g" latest-mac.yml
+          done
+          for f in "Hearth-$VERSION-Windows-x64-Setup.exe" "Hearth-$VERSION-Linux-amd64.deb" "Hearth-$VERSION-Linux-x86_64.AppImage" \
+                   "Hearth-$VERSION-Android.apk" "Hearth-$VERSION-iPhone-iPad-unsigned.ipa" "Hearth-Server-$VERSION-Linux-x64.tar.gz" latest.yml latest-linux.yml; do
+            [ -f "$f" ] || { echo "::error::$f is missing"; exit 1; }
+          done
+          sha256sum $(ls | grep -v -e '\.blockmap$' -e '\.yml$') > SHA256SUMS.txt
+          ls -la
+      - name: Release notes from CHANGELOG.md
+        run: |
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" {f=1; next}
+            f && /^## \[/ {exit}
+            f {print}
+          ' CHANGELOG.md > notes.md
+          test -s notes.md
+          cat >> notes.md <<'MD'
 
-          ### Which file do I need?
-          | | |
+          ### Downloads
+          | You have | Download |
           |---|---|
-          | **Mac** (Apple silicon: M1–M4) | `Hearth-…-mac-arm64.dmg` |
-          | **Mac** (Intel) | `Hearth-…-mac-x64.dmg` |
-          | **Windows** | `Hearth-…-win-x64.exe` |
-          | **Linux** | `.deb` (Ubuntu, Debian, Mint), `.rpm` (Fedora, openSUSE) or `.AppImage` (any) |
-          | **Android** phone or tablet | `Hearth-…-android.apk` |
-          | **iPhone / iPad** | `Hearth-…-ios-unsigned.ipa` — see the [phone app guide](https://github.com/shotgn16/hearth/blob/main/docs/install/phones-and-tablets.md) |
-          | **Docker** | `docker pull ghcr.io/shotgn16/hearth:latest` |
-          | **Home Assistant** | add this repository in the add-on store |
+          | Windows 10/11 | `…-Windows-x64-Setup.exe` |
+          | Mac with Apple chip (M1 or later) | `…-macOS-AppleSilicon.dmg` |
+          | Mac with Intel chip | `…-macOS-Intel.dmg` |
+          | Ubuntu, Debian, Mint, Raspberry Pi OS | `…-Linux-amd64.deb` (or `arm64`) |
+          | Fedora, openSUSE, RHEL | `…-Linux-x86_64.rpm` (or `aarch64`) |
+          | Other Linux | `…-Linux-x86_64.AppImage` (or `arm64`) |
+          | A server without a screen | `Hearth-Server-…-Linux-x64.tar.gz` (also `Linux-arm64`, `macOS`, `Windows-x64.zip`), then `./hearth-server service install` |
+          | Android | `…-Android.apk` |
+          | iPhone / iPad | `…-iPhone-iPad-unsigned.ipa` (sideload) |
+          | Docker | `docker run -d -p 8484:8484 -v hearth-data:/data ghcr.io/shotgn16/hearth:latest` |
+          | Home Assistant | add the repository `https://github.com/shotgn16/hearth` |
 
-          Step-by-step guides: [Installing Hearth](https://github.com/shotgn16/hearth/blob/main/docs/install/README.md)
-          EOF
-      - name: Create draft release
-        env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+          The installers aren't signed yet: on a Mac, right-click Hearth → **Open** the first time; on Windows, **More info → Run anyway**.
+          Check a download with `SHA256SUMS.txt`.
+
+          Step-by-step guides: [docs/install](https://github.com/shotgn16/hearth/tree/main/docs/install)
+          MD
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          ls -la artifacts
-          gh release create "${{ github.ref_name }}" artifacts/* --draft --title "Hearth ${{ needs.check.outputs.version }}" --notes-file notes.md
+          tag="v$VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" files/* --clobber
+          else
+            gh release create "$tag" files/* --target "$GITHUB_SHA" --title "Hearth $tag" --notes-file notes.md --latest
+          fi

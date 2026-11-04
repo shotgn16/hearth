@@ -8,7 +8,7 @@ The Hearth app for Android, iPhone and iPad connects to **your own Hearth**, whe
 
 ## Android (phones and tablets)
 
-1. On the phone, open the [downloads page](https://github.com/shotgn16/hearth/releases/latest) and tap `Hearth-<version>-android.apk` to download it.
+1. On the phone, open the [downloads page](https://github.com/shotgn16/hearth/releases/latest) and tap `Hearth-<version>-Android.apk` to download it.
 2. Open the download (from the notification, or the **Files** app → Downloads).
 3. If Android says your phone isn't allowed to install unknown apps from this source, tap **Settings**, turn on **Allow from this source**, and go back.
 4. Tap **Install**, then **Open**.
@@ -32,7 +32,7 @@ Hearth now has its own icon and opens full screen, like an app. Everything works
 
 This installs the real Hearth app using your own Apple ID. You need a Mac or Windows computer and a USB cable.
 
-1. Download `Hearth-<version>-ios-unsigned.ipa` from the [downloads page](https://github.com/shotgn16/hearth/releases/latest).
+1. Download `Hearth-<version>-iPhone-iPad-unsigned.ipa` from the [downloads page](https://github.com/shotgn16/hearth/releases/latest).
 2. Install [Sideloadly](https://sideloadly.io) (Mac or Windows) or [AltStore](https://altstore.io).
 3. Connect the iPhone or iPad with a cable and unlock it. Tap **Trust** if asked.
 4. Drag the `.ipa` into Sideloadly, enter your Apple ID, and press **Start**.

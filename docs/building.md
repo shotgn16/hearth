@@ -10,13 +10,26 @@ Most people should use the ready-made downloads. This guide is for publishing yo
 
 ```bash
 node tools/set-version.js 1.7.0
-# add a "## 1.7.0" section at the top of hearth/CHANGELOG.md
+# move the "## [Unreleased]" lines into a new "## [1.7.0] – <date>" section of CHANGELOG.md,
+# and add a short "## 1.7.0" section to hearth/CHANGELOG.md (shown in Home Assistant)
 git commit -am "1.7.0" && git tag v1.7.0 && git push && git push --tags
 ```
 
-A tag creates a **draft** release with every file attached and notes taken from the changelog. Check it, then press **Publish release**. Once it's published, desktop apps offer the update, and Home Assistant offers it once the Docker images are public.
+Or, after committing, open **Actions → Release → Run workflow** and enter the version (e.g. `1.7.0`): the workflow creates the `v1.7.0` tag itself.
 
-- Pushing to a `release/…` branch, or running the workflow from the **Actions** tab, builds and tests everything without publishing. The files are under the run's **Artifacts**.
+When every build passes, the release is **published straight away and marked Latest**, with every file attached, `SHA256SUMS.txt`, and notes taken from that version's section of `CHANGELOG.md` plus a downloads table. Desktop apps then offer the update, and Home Assistant offers it once the Docker images are public. The build stops before releasing if the version in the code doesn't match the tag, or `CHANGELOG.md` has no section for it. Running it again for the same version replaces the files on the existing release.
+
+| File | For |
+|---|---|
+| `Hearth-<v>-Windows-x64-Setup.exe` | Windows 10/11 |
+| `Hearth-<v>-macOS-AppleSilicon.dmg` / `-macOS-Intel.dmg` | Macs (the `-macOS-arm64.zip` / `-x64.zip` files are for in-app updates) |
+| `Hearth-<v>-Linux-amd64.deb` / `-arm64.deb`, `-x86_64.rpm` / `-aarch64.rpm`, `-x86_64.AppImage` / `-arm64.AppImage` | Linux |
+| `Hearth-Server-<v>-Linux-x64.tar.gz` (also `Linux-arm64`, `macOS-arm64`, `macOS-x64`, `Windows-x64.zip`) | Servers without a screen |
+| `Hearth-<v>-Android.apk` | Android |
+| `Hearth-<v>-iPhone-iPad-unsigned.ipa` | iPhone and iPad (sideload) |
+| `latest*.yml`, `*.blockmap` | The desktop apps' updater |
+
+- Pushing to a `release/…` branch, or running the workflow without a version, builds and tests everything without publishing. The files are under the run's **Artifacts**.
 - The first time the Docker images are published, make them public: GitHub → your profile → **Packages** → `hearth`, `hearth-amd64`, `hearth-aarch64` → **Package settings** → **Change visibility** → **Public**.
 
 ### What the workflow checks

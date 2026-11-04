@@ -32,6 +32,8 @@ protocols:
     schemes: [hearth]
 
 mac:
+  # Release names match LifeHub's; the dmgs are renamed …-macOS-AppleSilicon / -Intel.dmg when a release is published
+  artifactName: Hearth-${version}-macOS-${arch}.${ext}
   category: public.app-category.finance
   icon: build/icon.png
   target:
@@ -64,6 +66,7 @@ win:
   signtoolOptions:
     publisherName: shotgn16
 nsis:
+  artifactName: Hearth-${version}-Windows-x64-Setup.${ext}
   oneClick: false
   perMachine: false
   allowElevation: true
@@ -77,6 +80,7 @@ nsis:
   license: ../LICENSE
 
 linux:
+  artifactName: Hearth-${version}-Linux-${arch}.${ext}
   icon: build/icon.png
   maintainer: shotgn16 <shotgn16@users.noreply.github.com>
   vendor: shotgn16

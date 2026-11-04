@@ -7,8 +7,8 @@ Works on macOS 12 (Monterey) or newer, on Apple silicon and Intel Macs. Takes ab
 ## 1. Download
 
 From the [downloads page](https://github.com/shotgn16/hearth/releases/latest), get:
-- **Apple silicon** (M1, M2, M3, M4…): `Hearth-<version>-mac-arm64.dmg`
-- **Intel**: `Hearth-<version>-mac-x64.dmg`
+- **Apple silicon** (M1, M2, M3, M4…): `Hearth-<version>-macOS-AppleSilicon.dmg`
+- **Intel**: `Hearth-<version>-macOS-Intel.dmg`
 
 To check which you have, choose  → **About This Mac**.
 

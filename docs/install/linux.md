@@ -12,20 +12,20 @@ Get the right file from the [downloads page](https://github.com/shotgn16/hearth/
 **Ubuntu, Debian, Linux Mint, Pop!_OS, Zorin** (`.deb`): double-click the file to install it with Software Install, or in a terminal:
 
 ```bash
-sudo apt install ./Hearth-*-linux-amd64.deb
+sudo apt install ./Hearth-*-Linux-amd64.deb
 ```
 
 **Fedora, openSUSE, RHEL, Rocky** (`.rpm`):
 
 ```bash
-sudo dnf install ./Hearth-*-linux-x86_64.rpm        # openSUSE: sudo zypper install ./Hearth-…rpm
+sudo dnf install ./Hearth-*-Linux-x86_64.rpm        # openSUSE: sudo zypper install ./Hearth-…rpm
 ```
 
 **Any other Linux** (`.AppImage`): make the file executable and open it.
 
 ```bash
-chmod +x Hearth-*-linux-x86_64.AppImage
-./Hearth-*-linux-x86_64.AppImage
+chmod +x Hearth-*-Linux-x86_64.AppImage
+./Hearth-*-Linux-x86_64.AppImage
 ```
 
 On Ubuntu 22.04 and newer, AppImages need FUSE: `sudo apt install libfuse2t64` (on 22.04 it's `libfuse2`).

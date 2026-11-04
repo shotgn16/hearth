@@ -1,5 +1,5 @@
 // Copies the few files the phone app's pages need into www/ (run automatically by "npm run sync"):
-//   www/vendor/jsQR.js   reads QR codes from the camera, on the phone (MIT licence)
+//   www/vendor/jsQR.js   reads QR codes from the camera, on the phone (Apache-2.0 licence)
 //   www/icon.svg         the Hearth icon, from the server's web app
 import fs from 'node:fs';
 import path from 'node:path';

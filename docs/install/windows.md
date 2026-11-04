@@ -6,7 +6,7 @@ Works on Windows 10 and 11 (64-bit). Takes about 5 minutes.
 
 ## 1. Download
 
-From the [downloads page](https://github.com/shotgn16/hearth/releases/latest), get `Hearth-<version>-win-x64.exe`.
+From the [downloads page](https://github.com/shotgn16/hearth/releases/latest), get `Hearth-<version>-Windows-x64-Setup.exe`.
 
 ## 2. Install
 
