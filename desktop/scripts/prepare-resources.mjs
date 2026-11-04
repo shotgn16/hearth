@@ -81,7 +81,8 @@ async function nodeRuntime(version, plat, arch, destDir) {
   const inner = plat === 'win32' ? `${base}/node.exe` : `${base}/bin/node`;
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hearth-node-'));
   if (plat === 'win32' && process.platform !== 'win32' && process.platform !== 'darwin') execFileSync('unzip', ['-q', archive, inner, '-d', tmp]);
-  else execFileSync('tar', ['-xf', archive, '-C', tmp, inner]);
+  // On Windows use the system's own tar (bsdtar): Git Bash's GNU tar reads "D:\\…" as a network address
+  else execFileSync(process.platform === 'win32' ? path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe') : 'tar', ['-xf', archive, '-C', tmp, inner]);
   fs.copyFileSync(path.join(tmp, inner), path.join(destDir, exe));
   fs.chmodSync(path.join(destDir, exe), 0o755);
   fs.rmSync(tmp, { recursive: true, force: true });
@@ -98,6 +99,13 @@ function stageServer() {
   for (const f of SERVER_FILES) fs.cpSync(path.join(SERVER, f), path.join(staged, f), { recursive: true });
   log('Installing the server\'s packages');
   execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], { cwd: staged, stdio: 'inherit', shell: process.platform === 'win32' });
+  // npm's command shortcuts (node_modules/.bin) aren't needed, and copying them turns their links into absolute paths
+  // pointing at this build machine — which breaks the macOS signature and dangles everywhere else
+  fs.rmSync(path.join(staged, 'node_modules', '.bin'), { recursive: true, force: true });
+  const links = [];
+  const findLinks = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isSymbolicLink()) links.push(p); else if (e.isDirectory()) findLinks(p); } };
+  findLinks(staged);
+  if (links.length) throw new Error(`Symbolic links found — the bundled server must be plain files:\n${links.join('\n')}`);
   // Nothing native may sneak in: the same files must work on every platform
   const native = [];
   const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (/\.node$/.test(e.name)) native.push(p); } };
