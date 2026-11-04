@@ -49,7 +49,7 @@
 
   // ---------------------------------------------------------------- 2. details
   const folderField = (key, label, help) => `<div class="field"><span>${label}</span><div class="row"><code class="grow" id="${key}-show">${esc(cfg[key])}</code><button class="btn soft small" data-folder="${key}">Change…</button></div>${help ? `<span class="small muted">${help}</span>` : ''}</div>`;
-  const portField = () => `<details><summary>More options</summary><div class="field"><span>Port</span><input type="number" id="port" min="1024" max="65535" value="${esc(cfg.port)}" style="max-width:140px"><span class="small muted">The network port Hearth uses. 8484 unless something else already uses it.</span></div></details>`;
+  const portField = () => `<details><summary>More options</summary><div class="field"><span>Port</span><input type="number" id="port" min="1024" max="65535" value="${esc(cfg.port)}" class="narrow"><span class="small muted">The network port Hearth uses. 8484 unless something else already uses it.</span></div></details>`;
   const aiField = () => `<div class="field"><span>Local AI (optional)</span><div id="ai" class="note"><span class="spin"></span> Looking for Ollama on this computer…</div></div>`;
 
   function details() {
@@ -83,7 +83,7 @@
         <div class="field"><span>Long-lived access token</span><textarea id="haToken" placeholder="eyJhbGciOi…" spellcheck="false">${esc(cfg.haToken || '')}</textarea>
           <details><summary>How do I get a token?</summary><ol class="steps"><li>Open Home Assistant and sign in as an administrator.</li><li>Click your name at the bottom of the sidebar, then the <b>Security</b> tab.</li><li>Under <b>Long-lived access tokens</b> choose <b>Create token</b>, name it "Hearth installer" and copy it.</li><li>Paste it here. Hearth uses it once to install the add-on and doesn't keep it — you can delete the token afterwards.</li></ol></details></div>
         <div class="row"><button class="btn soft" id="test">Test connection</button><span id="result" class="grow"></span></div>
-        <p class="small muted" style="margin-top:14px">Needs Home Assistant OS or Supervised (with the add-on store). Prefer to do it yourself? <button class="link" id="mylink">Add the repository in Home Assistant</button>.</p></div>`;
+        <p class="small muted gap-top">Needs Home Assistant OS or Supervised (with the add-on store). Prefer to do it yourself? <button class="link" id="mylink">Add the repository in Home Assistant</button>.</p></div>`;
     }
     app.innerHTML = `<div class="brand"><img src="icon.svg" alt=""><span>Hearth</span></div>
       <h1>${M.title}</h1><p class="lead">${M.blurb}</p>${body}
@@ -112,7 +112,7 @@
     if (r.ok) { el.className = 'note ok'; el.textContent = `Docker ${r.version} is ready.`; $('#go').disabled = false; }
     else {
       el.className = 'note bad'; $('#go').disabled = true;
-      el.innerHTML = `${esc(r.problem)} <div class="row" style="margin-top:8px"><button class="btn soft small" id="getdocker">Get Docker</button><button class="btn soft small" id="recheck">Check again</button></div>`;
+      el.innerHTML = `${esc(r.problem)} <div class="row gap-top-sm"><button class="btn soft small" id="getdocker">Get Docker</button><button class="btn soft small" id="recheck">Check again</button></div>`;
       $('#getdocker').onclick = () => hearth.openExternal(S.platform === 'linux' ? 'https://docs.docker.com/engine/install/' : 'https://www.docker.com/products/docker-desktop/');
       $('#recheck').onclick = () => { el.className = 'note'; el.innerHTML = '<span class="spin"></span> Checking Docker…'; checkDocker(); };
     }
@@ -130,7 +130,7 @@
     cfg.haUrl = $('#haUrl').value.trim(); cfg.haToken = $('#haToken').value.trim(); const el = $('#result');
     el.innerHTML = '<span class="spin"></span>';
     const r = await hearth.testHomeAssistant(cfg.haUrl, cfg.haToken);
-    el.innerHTML = r.ok ? (r.addons === false ? `<span style="color:var(--red)">Home Assistant ${esc(r.version)} has no add-on store (Container or Core install) — choose Docker instead.</span>` : `<span style="color:var(--green)">✓ Connected to Home Assistant ${esc(r.version)}</span>`) : `<span style="color:var(--red)">${esc(r.error)}</span>`;
+    el.innerHTML = r.ok ? (r.addons === false ? `<span class="bad">Home Assistant ${esc(r.version)} has no add-on store (Container or Core install) — choose Docker instead.</span>` : `<span class="good">✓ Connected to Home Assistant ${esc(r.version)}</span>`) : `<span class="bad">${esc(r.error)}</span>`;
     return r.ok && r.addons !== false;
   }
 
@@ -177,7 +177,7 @@
         : res.needsSetup ? 'Next, create your household: your name, email and a password.' : 'Your household is ready to use.'}</p>
       ${phone && addrs.length ? `<div class="panel"><h3>Your phones</h3><p class="small muted">On the same Wi-Fi, phones can use the Hearth app or a browser with:</p>
         ${addrs.map((a) => `<div class="addr"><code>${esc(a.url)}</code><span class="small muted">${esc(a.label)}</span></div>`).join('')}
-        <p class="small muted" style="margin:10px 0 0">In Hearth, <b>Settings → Phones &amp; devices</b> shows a QR code that connects the phone app in one step.</p></div>` : ''}
+        <p class="small muted gap-top-sm flush">In Hearth, <b>Settings → Phones &amp; devices</b> shows a QR code that connects the phone app in one step.</p></div>` : ''}
       ${m === 'server' ? '<div class="note small">The household server runs on its own — you can close this app and Hearth keeps serving your household.</div>' : ''}
       <div class="footer"><span></span><button class="btn" id="open">Open Hearth</button></div>`;
     $('#open').onclick = () => hearth.finish();

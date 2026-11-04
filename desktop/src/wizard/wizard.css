@@ -73,3 +73,11 @@ ol.steps li { margin-bottom: 4px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .big-ok { width: 56px; height: 56px; border-radius: 50%; background: var(--green-soft); color: var(--green); display: grid; place-items: center; font-size: 28px; margin-bottom: 12px; }
 .addr { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 6px 0; }
+
+/* small helpers (the wizard's security policy doesn't allow inline style="" attributes) */
+.narrow { max-width: 140px; }
+.gap-top { margin-top: 14px; }
+.gap-top-sm { margin-top: 8px; }
+.flush { margin-bottom: 0; }
+.bad { color: var(--red); }
+.good { color: var(--green); }
