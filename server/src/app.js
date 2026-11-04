@@ -12,6 +12,9 @@ function createApp({ modules = require('./modules') } = {}) {
   app.use(express.json({ limit: '60mb' }));
   app.use(express.text({ limit: '60mb', type: ['text/*', 'application/x-ofx'] }));
 
+  // ---- each module's own tables (CREATE TABLE IF NOT EXISTS …), created once at start-up ----
+  for (const m of modules) if (m.schema) db.exec(m.schema);
+
   // ---- API: public routes first, then sign-in, then everything else ----
   const api = express.Router();
   for (const m of modules) if (m.publicRoutes) m.publicRoutes(api);

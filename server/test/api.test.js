@@ -178,6 +178,21 @@ test('the phone app may check /api/status, and nothing else', async () => {
   assert.equal(me.headers.get('access-control-allow-origin'), null, 'signed-in data is never shared with other origins');
 });
 
+test('a feature module can add its own table and routes', async () => {
+  const { createApp } = require('../src/app');
+  const { q } = require('../src/core/db');
+  const extra = { name: 'pets', title: 'Pets', schema: 'CREATE TABLE IF NOT EXISTS pets (id INTEGER PRIMARY KEY, household_id INTEGER, name TEXT)',
+    routes: (api) => { api.get('/pets', (req, res) => res.json(q.all('SELECT * FROM pets WHERE household_id=?', req.hid))); } };
+  const srv = createApp({ modules: [...require('../src/modules'), extra] }).listen(0, '127.0.0.1');
+  await new Promise((r) => srv.on('listening', r));
+  try {
+    const login = await h.call('POST', '/api/login', { email: 'alex@x.test', password: 'password1' });
+    const r = await fetch(`http://127.0.0.1:${srv.address().port}/api/pets`, { headers: { Authorization: `Bearer ${login.json.token}` } });
+    assert.equal(r.status, 200);
+    assert.deepEqual(await r.json(), []);
+  } finally { srv.close(); }
+});
+
 test('sign out ends the session', async () => {
   assert.equal((await h.call('POST', '/api/logout', {})).status, 200);
   assert.equal((await h.call('GET', '/api/me')).status, 401);

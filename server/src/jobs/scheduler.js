@@ -148,6 +148,8 @@ async function householdTick(hid) {
       await dailyDigest(hid).catch((e) => log.warning('daily digest', e.message));
       await aiJobs(hid).catch((e) => log.warning('AI jobs', e.message));
       await sensors(hid).catch((e) => log.debug('sensors', e.message));
+      // Background jobs added by feature modules (see src/modules/index.js)
+      for (const m of require('../modules')) if (m.job) await m.job(hid).catch((e) => log.warning(`${m.name} job`, e.message));
     }
   }
 }

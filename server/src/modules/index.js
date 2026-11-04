@@ -5,6 +5,8 @@
 //   title          what it is, for people reading the code
 //   publicRoutes   (optional) function(api) — routes that work before signing in
 //   routes         function(api) — routes for signed-in users (req.user and req.hid are set)
+//   schema         (optional) SQL run at start-up — use CREATE TABLE IF NOT EXISTS … for the module's own tables
+//   job            (optional) async function(householdId) — runs with the background jobs, every 15 minutes
 //
 // To add a feature, create modules/<your-feature>/index.js and add it below.
 // To take one out, remove its line (and its screen in web/js). See docs/customising.md.

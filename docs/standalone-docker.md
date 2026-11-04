@@ -2,19 +2,38 @@
 
 [← Documentation](../README.md#documentation)
 
-The add-on is an ordinary container, so it also runs on any Docker host.
+Hearth's Docker image runs on any Docker host: Linux, a NAS, or Docker Desktop on Mac and Windows. On amd64 and arm64 (e.g. Raspberry Pi 4/5).
 
-```bash
-git clone https://github.com/shotgn16/hearth.git
-cd hearth
-docker compose up -d --build
+**Easiest:** in the Hearth desktop app choose **Install in Docker**. It writes the compose file, starts the container and connects the app to it.
+
+**By hand**, make a folder with this `compose.yaml` and run `docker compose up -d`:
+
+```yaml
+services:
+  hearth:
+    image: ghcr.io/shotgn16/hearth:latest
+    container_name: hearth
+    restart: unless-stopped
+    ports:
+      - "8484:8484"
+    volumes:
+      - ./data:/data
+    environment:
+      TZ: Europe/London
+      OLLAMA_URL: http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 ```
 
-Open `http://<server>:8484` and create your household. Data is stored in `./data` — the database (`hearth.db`), receipt files and the encryption key (`hearth.key`).
+Or from a copy of this repository: `docker compose up -d` (add `--build` to build the image from `server/` yourself).
+
+Open `http://<server>:8484` and create your household. Data is stored in `./data`: the database (`hearth.db`), receipt files and the encryption key (`hearth.key`). Phones connect as described in [Phones & tablets](install/phones-and-tablets.md).
+
+**Updating:** `docker compose pull && docker compose up -d`. Your data is kept.
 
 ## Settings
 
-Edit `docker-compose.yml`:
+Set these under `environment:` in the compose file:
 
 | Variable | Default | |
 |---|---|---|
@@ -52,12 +71,12 @@ Back up the whole `data` folder (stop the container first, or copy while it's id
 
 ## Without Docker
 
-Needs Node.js 22.13 or newer.
+Use the [Hearth Server](install/server-only.md) download, which includes its own Node.js. Or, from a copy of this repository with Node.js 22.13 or newer:
 
 ```bash
-cd hearth
+cd server
 npm ci
-npm start                 # data in hearth/data
+npm start                 # data in server/data
 npm run demo              # sample household on port 8485 (alex@demo.local / demo1234)
 ```
 

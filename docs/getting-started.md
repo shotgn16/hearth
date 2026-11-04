@@ -4,18 +4,19 @@
 
 This takes about 15 minutes, most of it waiting for your bank history to import.
 
-## 1. Install the add-on
+## 1. Install Hearth
 
-1. In Home Assistant open **Settings → Add-ons → Add-on Store**, then **⋮ → Repositories**, add `https://github.com/shotgn16/hearth` and close the dialog. (Or use the **Add repository** button on the [project page](../README.md).)
-2. Scroll to **Hearth**, open it and press **Install**. Home Assistant downloads a ready-made image for your machine (amd64 or aarch64) — there's nothing to compile.
+Follow [Installing Hearth](install/README.md) for your computer, server, Docker or Home Assistant. The desktop app's setup wizard does everything for you.
 
-## 2. Start it
+**In Home Assistant:** press **Start** on the add-on and turn on **Show in sidebar**. There's nothing to fill in on the add-on's Configuration tab: every setting lives inside Hearth. The only thing there is an optional network port (see [Using Hearth outside the panel](home-assistant.md#using-hearth-outside-the-panel-optional-network-port)).
 
-Press **Start** and turn on **Show in sidebar**. There's nothing to fill in on the add-on's Configuration tab: every setting lives inside Hearth. The only thing there is an optional network port (see [Using Hearth outside the panel](home-assistant.md#using-hearth-outside-the-panel-optional-network-port)).
+## 2. Open it
+
+Open the Hearth desktop app, the **Hearth** entry in the Home Assistant sidebar, or `http://<server>:8484` in a browser.
 
 ## 3. Create your household
 
-Open **Hearth** from the sidebar. The first screen, **Set up Hearth**, creates your household and your account; your name is filled in from Home Assistant. Choose an email and a password of 8 or more characters — you'll need them to sign in outside the HA panel — and press **Create household** once. Your Hearth account is linked to your HA login, so from now on the panel signs you straight in.
+The first screen, **Set up Hearth**, creates your household and your account. Choose an email and a password of 8 or more characters (you'll use them on your phone too) and press **Create household** once. In Home Assistant, your name is filled in for you and your Hearth account is linked to your HA login, so from then on the panel signs you straight in.
 
 Only the very first account is created this way. Everyone else is added from inside Hearth (step 5); if you see *Already set up*, the household already exists — reload and sign in.
 
@@ -39,18 +40,20 @@ As transactions arrive, Hearth cleans up merchant names, categorises them, spots
 
 **Settings → People & household**:
 
-- **Users** are people who sign in (your partner, older children). Give them a temporary password; the first time they open Hearth from the HA sidebar they sign in once and their HA login is linked.
+- **Users** are people who sign in (your partner, older children). Give them a temporary password. They sign in on their own phone or computer ([Phones & tablets](install/phones-and-tablets.md)); in Home Assistant, the first time they open Hearth from the sidebar they sign in once and their HA login is linked.
 - **People you spend on** are tracked without a login — younger children, parents, pets.
 
 See [Households](household.md).
 
 ## 6. Bring in your calendars
 
-**Settings → Calendars → From Home Assistant** lists every calendar you've connected to HA. Tick the ones you want copied. Outlook / Microsoft 365 calendars can also come in through a Microsoft sign-in, and anything else by iCal link. See [Calendars and event costs](calendars-and-events.md).
+**Settings → Calendars**: with Home Assistant, **From Home Assistant** lists every calendar you've connected to HA; tick the ones you want copied. Outlook / Microsoft 365 calendars can also come in through a Microsoft sign-in, and anything else by iCal link. See [Calendars and event costs](calendars-and-events.md).
 
-## 7. Turn on notifications
+## 7. Connect your phones
 
-**Settings → Integrations → Home Assistant** — pick which HA notify services (your phones) should receive Hearth's notifications. Workflows can target specific phones too. See [Workflows](workflows.md).
+**Settings → Phones & devices** shows a QR code: scan it with the Hearth app. See [Phones & tablets](install/phones-and-tablets.md).
+
+**Notifications** go to the bell in Hearth. With Home Assistant, **Settings → Integrations → Home Assistant** lets you pick which HA notify services (your phones) should receive Hearth's notifications. Workflows can target specific phones too. See [Workflows](workflows.md).
 
 ## 8. Set a couple of budgets
 
@@ -58,7 +61,7 @@ See [Households](household.md).
 
 ## 9. Keep a backup
 
-Hearth is included in your Home Assistant backups. Turn on backup encryption in Home Assistant (**Settings → System → Backups**), because the backup also holds the key that protects your bank and mailbox logins. See [Privacy, security and backups](privacy-and-security.md).
+Back up Hearth's data folder. Its location for each kind of install is in the [install guides](install/README.md). In Home Assistant, Hearth is included in your backups; turn on backup encryption in Home Assistant (**Settings → System → Backups**), because the backup also holds the key that protects your bank and mailbox logins. See [Privacy, security and backups](privacy-and-security.md).
 
 That's it. From here on the idea is that you mostly look at **Today** and clear **Needs attention** when the badge appears.
 
