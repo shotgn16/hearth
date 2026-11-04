@@ -2,17 +2,18 @@
 
 [← Documentation](../README.md#documentation)
 
-## Connecting your bank (superFin)
+## Connecting your bank
 
 **Settings → Bank connections**
 
-Paste the **setup token** (a long string of letters) or **access URL** (`https://user:pass@…`) that superFin gives you, choose who the accounts belong to (joint, or one person), and press **Connect and import**.
+Hearth works with any **SimpleFIN** bank feed — **Synci** (UK banks, below), superFin or SimpleFIN Bridge. Paste the **setup token** (a long string of letters) or **access URL** (`https://user:pass@…`) the feed gives you, give the connection a name, choose who the accounts belong to (shared / joint, or one person), and press **Connect and import**.
 
 What happens:
 
-1. Hearth claims the setup token once and stores the resulting access URL in its local database. Setup tokens can only be claimed once, so if you need to reconnect, generate a new one.
-2. It pulls every account and the transaction history the bank allows, from the **Pull history from** date. SimpleFIN only allows 90 days per request, so Hearth steps back 90 days at a time — up to about 2 years — and stops when history runs out. UK open banking usually gives 90 days to 2 years; for anything older, [import a statement](#importing-statements).
-3. It then syncs automatically every 4 hours, re-reading the last 14 days each time so pending card payments that later post with a different reference don't end up duplicated.
+1. Hearth claims the setup token once and stores the resulting access URL in its local database, encrypted. Setup tokens can only be claimed once, so if you need to reconnect, generate a new one. Tokens must point to an `https://` address.
+   If the first import fails after the token has been claimed, the connection is kept and shows the error — press **Sync now** to retry; you don't need a new token.
+2. It pulls every account and the transaction history the bank allows, from the **Pull history from** date (1 Jan 2000 by default, i.e. as far back as possible). SimpleFIN only allows 90 days per request, so Hearth steps back 90 days at a time — up to about 2 years — and stops when history runs out. UK open banking usually gives 90 days to 2 years; for anything older, [import a statement](#importing-statements).
+3. It then syncs automatically every 4 hours, re-reading the last 14 days each time so pending card payments that later post with a different reference don't end up duplicated. The first import doesn't run workflows or large-payment alerts for your historical payments.
 
 ### Synci (UK banks)
 
@@ -20,13 +21,13 @@ In Synci go to **Destinations → SimpleFIN** (or **Actual Budget**, which uses 
 
 Per connection you can **Sync now**, **Re-pull history**, switch **Auto** sync off, or **Remove** it (transactions already imported stay).
 
-Change the sync interval under **Settings → Your data**.
+Change the sync interval under **Settings → Your data → Timing**, or press **Sync everything now** there.
 
 ### Which protocol?
 
-Hearth talks the **SimpleFIN** protocol, which superFin-style bridges use: a one-time setup token that becomes an access URL, and an `/accounts` endpoint returning accounts with balances and transactions.
+Hearth talks the **SimpleFIN** protocol (including v2), which Synci, superFin and SimpleFIN Bridge use: a one-time setup token that becomes an access URL, and an `/accounts` endpoint returning accounts with balances and transactions.
 
-If your feed uses a different API, open **"superFin uses a different API?"** on the same screen and map it without any code:
+If your feed uses a different API, open **"superFin uses a different API? Map any JSON bank feed"** on the same screen and map it without any code:
 
 | Field | Example |
 |---|---|

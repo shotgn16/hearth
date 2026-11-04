@@ -1,0 +1,127 @@
+name: Docker images
+
+# Builds the Hearth server image from server/Dockerfile:
+#   ghcr.io/shotgn16/hearth:<version> and :latest      multi-arch — Docker / "Install in Docker" in the desktop installers
+#   ghcr.io/shotgn16/hearth-amd64:<version>           \ the Home Assistant add-on (image: in hearth/config.yaml),
+#   ghcr.io/shotgn16/hearth-aarch64:<version>         / so Home Assistant downloads Hearth instead of building it
+#
+# Pushes to main and releases (release.yml calls this) publish (skipping versions that already exist). Pull requests and other
+# branches only build and test. Can also be run by hand from the Actions tab.
+
+on:
+  push:
+    branches: [main, "release/**"]
+    paths: ["server/**", "hearth/config.yaml", ".github/workflows/images.yml"]
+  pull_request:
+    paths: ["server/**", ".github/workflows/images.yml"]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to ghcr.io (otherwise build and test only)"
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      publish:
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - { arch: amd64, platform: linux/amd64, runner: ubuntu-24.04 }
+          - { arch: aarch64, platform: linux/arm64, runner: ubuntu-24.04-arm }
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      publish: ${{ steps.v.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version
+        id: v
+        run: |
+          v=$(node -p "require('./server/package.json').version")
+          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          publish=false
+          if [ "${{ github.ref }}" = "refs/heads/main" ] || [ "${{ inputs.publish }}" = "true" ]; then publish=true; fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "owner=$owner" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "addon=ghcr.io/$owner/hearth-${{ matrix.arch }}" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@v3
+        if: steps.v.outputs.publish == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Already published?
+        id: exists
+        if: steps.v.outputs.publish == 'true'
+        run: |
+          if docker manifest inspect "${{ steps.v.outputs.addon }}:${{ steps.v.outputs.version }}" >/dev/null 2>&1; then
+            echo "yes=true" >> "$GITHUB_OUTPUT"; echo "Hearth ${{ steps.v.outputs.version }} is already published — skipping"
+          fi
+      - uses: docker/setup-buildx-action@v3
+      - name: Build
+        if: steps.exists.outputs.yes != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: server
+          platforms: ${{ matrix.platform }}
+          provenance: false
+          load: true
+          build-args: |
+            VERSION=${{ steps.v.outputs.version }}
+            BUILD_ARCH=${{ matrix.arch }}
+          tags: |
+            ${{ steps.v.outputs.addon }}:${{ steps.v.outputs.version }}
+            ${{ steps.v.outputs.addon }}:latest
+            ghcr.io/${{ steps.v.outputs.owner }}/hearth:${{ steps.v.outputs.version }}-${{ matrix.arch }}
+      - name: Smoke test
+        if: steps.exists.outputs.yes != 'true'
+        run: |
+          docker run -d --name hearth -p 8484:8484 "${{ steps.v.outputs.addon }}:${{ steps.v.outputs.version }}"
+          for i in $(seq 1 30); do
+            if curl -fs http://localhost:8484/api/status; then echo; curl -fs http://localhost:8484/ | grep -q '<base href' && echo "Web app OK" && exit 0; fi
+            sleep 2
+          done
+          docker logs hearth; exit 1
+      - name: Publish
+        if: steps.v.outputs.publish == 'true' && steps.exists.outputs.yes != 'true'
+        run: |
+          docker push "${{ steps.v.outputs.addon }}:${{ steps.v.outputs.version }}"
+          docker push "${{ steps.v.outputs.addon }}:latest"
+          docker push "ghcr.io/${{ steps.v.outputs.owner }}/hearth:${{ steps.v.outputs.version }}-${{ matrix.arch }}"
+
+  # One multi-arch name for Docker users: ghcr.io/<owner>/hearth:<version> and :latest
+  manifest:
+    needs: image
+    if: needs.image.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Combine amd64 + arm64
+        run: |
+          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          v="${{ needs.image.outputs.version }}"
+          img="ghcr.io/$owner/hearth"
+          docker buildx imagetools create -t "$img:$v" -t "$img:latest" "$img:$v-amd64" "$img:$v-aarch64"
+      - name: Check anyone can download them (Home Assistant and Docker pull without signing in)
+        run: |
+          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          docker logout ghcr.io
+          for p in hearth hearth-amd64 hearth-aarch64; do
+            if docker manifest inspect "ghcr.io/$owner/$p:${{ needs.image.outputs.version }}" >/dev/null 2>&1; then echo "$p: public"
+            else echo "::warning::ghcr.io/$owner/$p is not public yet. GitHub → your profile → Packages → $p → Package settings → Change visibility → Public."; fi
+          done

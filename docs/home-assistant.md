@@ -8,9 +8,9 @@ Because Hearth runs as an add-on, it talks to Home Assistant directly through th
 
 ## Sidebar panel and sign-in
 
-Hearth appears in the HA sidebar and in the HA app on every phone. The panel identifies you from your Home Assistant login: the first time, you sign in to Hearth once to link the two; after that it opens straight in. (Turn on **Let any Home Assistant user in** in **Settings → App settings** to give every HA user their own Hearth login automatically.)
+Hearth appears in the HA sidebar and in the HA app on every phone. The panel identifies you from your Home Assistant login: the first time, you sign in to Hearth once to link the two; after that it opens straight in. (Turn on **Let any Home Assistant user in** in **Settings → App settings & security** to give every HA user their own Hearth login automatically.)
 
-Hearth only trusts HA's identity information when the request really comes through Home Assistant's ingress proxy.
+Hearth only trusts HA's identity information when the request really comes through Home Assistant's ingress proxy. Sign-ins last 30 days from the last time you open Hearth; see [Privacy, security and backups](privacy-and-security.md#sign-in-and-access).
 
 ## Notifications to your phones
 
@@ -29,7 +29,7 @@ Everything also appears under the bell in Hearth.
 
 ## Sensors
 
-With **Publish sensors** on (**Settings → App settings**), Hearth updates these entities every 15 minutes:
+With **Publish sensors** on (**Settings → App settings & security**, on by default), Hearth updates these entities every 15 minutes:
 
 | Entity | State | Attributes |
 |---|---|---|
@@ -37,7 +37,7 @@ With **Publish sensors** on (**Settings → App settings**), Hearth updates thes
 | `sensor.hearth_spent_this_month` | Spending so far this month | |
 | `sensor.hearth_balance` | Total across accounts | |
 | `sensor.hearth_needs_attention` | Items waiting in Needs attention | |
-| `sensor.hearth_next_payment` | Date of the next regular payment | `merchant`, `amount` |
+| `sensor.hearth_next_payment` | Date of the next regular payment (`none` if there isn't one) | `merchant`, `amount` |
 
 Money sensors use the `monetary` device class in GBP.
 
@@ -121,15 +121,22 @@ actions:
         £{{ state_attr('sensor.hearth_next_payment','amount') }} tomorrow
 ```
 
+## Using Hearth outside the panel (optional network port)
+
+The sidebar panel works in the HA app on every phone, so most households never need this. If you'd like Hearth as its own installed app (its own home-screen icon), open the add-on's **Configuration** tab, set a host port for `8484/tcp` under **Network**, and put that port behind HTTPS — for example Nginx Proxy Manager or the NGINX add-on. Sign in there with your Hearth email and password.
+
+Don't expose the port directly to the internet: reach it through a VPN (Tailscale, WireGuard) or an HTTPS reverse proxy. **Settings → App settings & security** tells you whether the connection you're using is encrypted.
+
 ## Backups
 
-Hearth's database lives in the add-on's own storage and is included in Home Assistant backups. Just before each backup Hearth flushes its write-ahead log so the copy is consistent.
+Hearth's database lives in the add-on's own storage and is included in Home Assistant backups. Just before each backup Hearth flushes its write-ahead log so the copy is consistent. The backup also contains `hearth.key`, the key that unlocks your saved bank, mailbox and calendar logins, so turn on backup encryption in Home Assistant (**Settings → System → Backups**). To restore Hearth, restore the add-on from a Home Assistant backup.
 
 ## Permissions the add-on asks for
 
 | Permission | Why |
 |---|---|
 | `ingress` | The sidebar panel |
+| `ports: 8484/tcp` (off unless you set it) | Optional direct access, e.g. to install Hearth as its own app behind an HTTPS proxy — see [Privacy](privacy-and-security.md#sign-in-and-access) |
 | `homeassistant_api` | Notify services, calendars, sensors, events and service calls |
 | `hassio_api` (default role) | Reads its own add-on info so phone notifications can open the panel |
 

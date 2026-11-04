@@ -1,0 +1,27 @@
+{
+  "name": "hearth-mobile",
+  "version": "1.6.0",
+  "description": "Hearth phone and tablet app (iPhone, iPad, Android) \u2014 connects to your own Hearth",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "vendor": "node scripts/vendor.mjs",
+    "test": "node --test --test-reporter=spec \"test/**/*.test.mjs\"",
+    "sync": "npm run vendor && cap sync",
+    "icons": "capacitor-assets generate --iconBackgroundColor '#1f2e28' --iconBackgroundColorDark '#141c19' --splashBackgroundColor '#1f2e28' --splashBackgroundColorDark '#141c19' --android --ios",
+    "android:apk": "npm run sync -- android && cd android && ./gradlew assembleRelease",
+    "android:open": "npm run sync -- android && cap open android",
+    "ios:open": "npm run sync -- ios && cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.0",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/ios": "8.6.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "8.6.0",
+    "jsqr": "1.4.0"
+  }
+}

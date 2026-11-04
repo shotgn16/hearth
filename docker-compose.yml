@@ -1,7 +1,10 @@
-# Standalone install (without Home Assistant). With Home Assistant, install it as an add-on instead — see README.
+# Hearth in Docker (without Home Assistant).   docker compose up -d   →   http://<this computer>:8484
+# Uses the ready-made image; to build from this folder instead run:  docker compose up -d --build
+# Your data (including the encryption key hearth.key) is kept in ./data — back up that whole folder.
 services:
   hearth:
-    build: ./hearth
+    image: ghcr.io/shotgn16/hearth:latest
+    build: ./server
     container_name: hearth
     restart: unless-stopped
     ports:

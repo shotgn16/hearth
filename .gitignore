@@ -3,3 +3,13 @@ data/
 demo-data/
 caddy-data/
 .env
+dist/
+build/runtime/
+*.log
+.DS_Store
+desktop/build/resources/
+mobile/www/vendor/
+mobile/android/app/build/
+mobile/ios/App/build/
+mobile/www/icon.svg
+desktop/build/cache/

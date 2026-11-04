@@ -4,7 +4,7 @@
 
 ## Where your data lives
 
-Everything — accounts, transactions, budgets, notes, calendar copies, email receipts, AI conversations and settings — is stored in a single SQLite database, `hearth.db`, in the add-on's data folder (`/data` inside the container; `./data` for Docker installs). Receipt PDFs and images are kept alongside it in `receipts/`.
+Everything — accounts, transactions, budgets, notes, calendar copies, email receipts, AI conversations and settings — is stored in a single SQLite database, `hearth.db`, in the add-on's data folder (`/data` inside the container; `./data` for Docker installs). Receipt PDFs and images are kept alongside it in `receipts/`, and the encryption key in `hearth.key`.
 
 ## What leaves your network, and when
 
@@ -12,7 +12,7 @@ Hearth has no cloud service, no account with the developers and no telemetry. It
 
 | Connection | What is sent | When |
 |---|---|---|
-| Your bank feed (superFin/SimpleFIN) | The access credentials it gave you | Every sync |
+| Your bank feed (Synci, superFin, SimpleFIN Bridge or a custom JSON feed) | The access credentials it gave you | Every sync |
 | Calendar links (iCal) | Nothing beyond fetching the link | Hourly |
 | Your mailboxes (IMAP / Exchange) | Your app password, to read mail | Every 30 minutes (configurable) |
 | Microsoft (Outlook.com / 365) | Your Entra app's client ID and sign-in token, to read mail and calendars via Microsoft Graph | Mail every 30 minutes, calendar hourly |
@@ -44,14 +44,15 @@ Transactions, budgets and notes themselves are not encrypted field-by-field: Hea
 - The panel in Home Assistant signs you in as your HA user, and Hearth trusts that only when the request really comes through the Supervisor's ingress proxy.
 - 8 wrong passwords for one account (or 20 from one address) in 15 minutes pauses sign-in for 15 minutes.
 - The browser is locked down: only Hearth's own code can run (a strict Content Security Policy), nothing loads from other sites, and other sites can't embed Hearth.
-- Everyone in a household can see the whole household's finances. Admin users can add and remove users and change app settings.
+- Everyone in a household can see the whole household's finances. Admin users can add and remove users, reset passwords and change app settings.
+- **Settings → App settings & security** shows what's encrypted, where the key is kept, whether your current connection is encrypted, and how many devices you're signed in on.
 - Don't expose Hearth's network port directly to the internet — use the HA app, a VPN (Tailscale, WireGuard) or an HTTPS reverse proxy.
 
 ## Backups
 
-- **Add-on:** included in Home Assistant backups. Hearth flushes its database to disk just before each backup.
-- **Docker:** back up the `data` folder.
-- **Any install:** **Settings → Your data → Download encrypted backup** exports everything, locked with your passphrase. **Export all transactions (CSV)** gives an unencrypted spreadsheet copy — keep it private.
+- **Add-on:** included in Home Assistant backups (with `hearth.key`, so turn on HA backup encryption). Hearth flushes its database to disk just before each backup. To restore, restore the add-on from the HA backup.
+- **Docker:** back up the whole `data` folder, including `hearth.key` — or set `HEARTH_SECRET_KEY` and keep that value somewhere safe.
+- **Any install:** **Settings → Your data → Download encrypted backup** saves a `.hearth` file locked with your passphrase (8+ characters): accounts, transactions, categories, tags, people, budgets, goals, workflows, events, notes, regular payments, email receipt details, price watches, year-planner cells and saved views. It leaves out bank, mailbox and calendar connections, settings, AI conversations and receipt files, and there's no in-app restore yet — it's a portable copy for safekeeping. **Export all transactions (CSV)** gives an unencrypted spreadsheet copy — keep it private.
 
 ## Financial advice
 

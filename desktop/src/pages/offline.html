@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'">
+  <title>Can't reach Hearth</title>
+  <link rel="stylesheet" href="../wizard/wizard.css">
+</head>
+<body>
+  <main>
+    <div class="brand"><img src="../wizard/icon.svg" alt=""><span>Hearth</span></div>
+    <h1>Can't reach Hearth</h1>
+    <p class="lead" id="lead">Hearth didn't answer.</p>
+    <div class="panel">
+      <p class="small muted">Address: <code id="url"></code></p>
+      <p class="small" id="reason"></p>
+      <ul class="small" id="tips"></ul>
+    </div>
+    <div class="footer"><a class="btn soft" href="hearth-action:setup">Change setup…</a><a class="btn" href="hearth-action:retry">Try again</a></div>
+  </main>
+  <script src="offline.js"></script>
+</body>
+</html>

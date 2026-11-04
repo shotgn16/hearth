@@ -7,8 +7,8 @@ Hearth uses your own [Ollama](https://ollama.com) server. Prompts and your finan
 ## Setting it up
 
 1. Make sure Ollama listens on your network. On the machine running it, set `OLLAMA_HOST=0.0.0.0` (for the Linux service: `sudo systemctl edit ollama`, add `Environment="OLLAMA_HOST=0.0.0.0"` under `[Service]`, then restart).
-2. In the add-on's **Configuration**, set **Ollama address** to `http://<that machine's IP>:11434` and **Chat model** to a model you've pulled.
-3. Open **Settings → Local AI** in Hearth. The top card shows whether Ollama is reachable, its version, the installed models and which are loaded right now.
+2. In Hearth open **Settings → Local AI** and set **Ollama address** to `http://<that machine's IP>:11434` (until you change it, the add-on tries `http://homeassistant.local:11434`; Docker installs use `OLLAMA_URL`).
+3. Pick a **Chat & advice** model you've pulled (`qwen2.5:7b-instruct` by default). The top card shows whether Ollama is reachable, its version, the installed models and which are loaded right now.
 
 <img src="images/local-ai-settings.jpg" alt="Local AI settings" width="100%">
 
@@ -20,13 +20,14 @@ Hearth uses up to three models, each for the job it's best at:
 |---|---|---|
 | **Chat & advice** | Ask Hearth, monthly reviews, budget suggestions, subscription review, event estimates, workflow drafts | `qwen2.5:7b-instruct`, `qwen3:8b`, `llama3.1:8b` |
 | **Background jobs (fast)** | Categorising new transactions, reading notes, smart search, check-ins | `qwen2.5:3b-instruct`, `llama3.2:3b` — or leave as the chat model |
-| **Receipts (vision)** | Reading receipt photos | `qwen2.5vl:7b`, `llama3.2-vision`, `minicpm-v` |
+| **Receipts (vision)** | Reading receipt photos | `qwen2.5vl:7b`, `llama3.2-vision`, `minicpm-v` — or *None* to hide receipt scanning |
 
 Other settings:
 
 - **Context window** — 8,192 tokens suits 7–8B models on modest hardware. Raise it if your GPU has room and long conversations lose track.
-- **Keep model loaded for** — how long Ollama keeps the model in memory after a request. Longer = faster replies, more memory held.
+- **Keep model loaded for** — how long Ollama keeps the model in memory after a request (10 minutes by default). Longer = faster replies, more memory held.
 - **Creativity** — *Precise* for the most factual answers; *Balanced* by default.
+- **Use local AI** — the master switch. Off, Hearth works without Ollama: categorising uses your own corrections and built-in patterns, and the AI buttons (smart search, Ask AI what to cut, Describe it, AI reviews…) are hidden.
 - **House rules** — free text added to every conversation, e.g. *We're saving for a house deposit, so nudge us towards that. Keep answers very short. Sam does the food shop.*
 
 ## Ask Hearth
@@ -88,8 +89,8 @@ Each can be switched off under **Settings → Local AI → What the AI does for 
 |---|---|
 | **File unknown transactions** | After each bank sync or import, the fast model categorises anything the built-in rules and your past corrections didn't cover, using your own past decisions as examples and skipping anything it's unsure about. These show in Needs attention as "The AI filed N transactions". **Looks right** teaches Hearth those merchants permanently. |
 | **Help read quick notes** | When a jotted note is ambiguous, the AI works out the amount, date, category and person. |
-| **Monthly review** | On the 1st (after your morning summary time) it writes a short review of the previous month — how it compared with last month and last year, what drove it, budgets, goals, anything new — and notifies you. All reviews live under **Insights → AI reviews**, where you can also write one for any month. |
-| **Monday check-in** | A two-sentence heads-up about the week ahead. Off by default. |
+| **Monthly review** | On the 1st (after your morning summary time, or in the next couple of days if Hearth was off) it writes a short review of the previous month — how it compared with last month and last year, what drove it, budgets, goals, anything new — and notifies you. All reviews live under **Insights → AI reviews**, where you can also write one for any month. |
+| **Monday check-in** | A two-sentence heads-up about the week ahead, after your morning summary time. Off by default. |
 | **Receipt scanning** | Reads receipt photos with the vision model and matches them to bank payments within four days by amount. |
 | **Email receipts** | When the rule-based reader isn't sure about a receipt email, the fast model reads it (and the vision model reads photo receipts). Results still wait for your approval. |
 
